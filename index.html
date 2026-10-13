@@ -1,0 +1,803 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>McCune Park Pins</title>
+<meta name="robots" content="noindex,nofollow">
+<meta name="referrer" content="no-referrer">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Park Pins">
+<link rel="apple-touch-icon" href="icon.png">
+<link rel="icon" href="icon.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700&family=Public+Sans:wght@400;500;600;700&display=swap">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
+<style>
+/* Layout: a field-ops tool. Header bar with a view switch, then the park map + working panel side by side (stacked on phones). */
+:root{
+  --bg:#f2f4f0; --surface:#ffffff; --surface2:#e8ece5; --ink:#1b221e; --muted:#5b665f; --line:#d3dad1;
+  --accent:#74461f; --accent-ink:#ffffff; --accent-soft:#f1e5d8;
+  --s-new:#bf3b27; --s-received:#a86a0c; --s-progress:#2563a8; --s-done:#2e7d4f;
+  --display:"Barlow Condensed","Arial Narrow",system-ui,sans-serif;
+  --body:"Public Sans",system-ui,-apple-system,"Segoe UI",sans-serif;
+  --r:10px; color-scheme:light;
+}
+@media (prefers-color-scheme:dark){:root{
+  --bg:#131815; --surface:#1b221e; --surface2:#232c27; --ink:#e7ece8; --muted:#9aa69f; --line:#2f3a34;
+  --accent:#d59a63; --accent-ink:#1b1209; --accent-soft:#3a2a1c;
+  --s-new:#f07a66; --s-received:#e3ac4a; --s-progress:#6ea8ea; --s-done:#62c48c;
+  color-scheme:dark}}
+*{box-sizing:border-box}
+html{padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--body);font-size:15px;line-height:1.45}
+[hidden]{display:none!important}
+img{max-width:100%}
+button,input,select,textarea{font:inherit;color:inherit}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+
+.top{display:flex;flex-wrap:wrap;align-items:center;gap:12px 20px;padding:12px 16px;background:var(--surface);border-bottom:1px solid var(--line)}
+.brand{display:flex;flex-direction:column;min-width:0}
+.brand b{font-family:var(--display);font-weight:700;font-size:26px;letter-spacing:.01em;line-height:1}
+.brand span{font-size:12.5px;color:var(--muted)}
+.topright{margin-left:auto;display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.switch{display:flex;background:var(--surface2);border-radius:999px;padding:3px}
+.switch button{border:0;background:transparent;padding:7px 14px;border-radius:999px;font-weight:600;font-size:14px;cursor:pointer;color:var(--muted)}
+.switch button[aria-pressed="true"]{background:var(--surface);color:var(--ink);box-shadow:0 1px 2px rgb(0 0 0/.15)}
+.viewlabel{font-size:12px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--accent);background:var(--accent-soft);padding:6px 12px;border-radius:999px}
+.banner{margin:12px 16px 0;padding:10px 12px;border-radius:var(--r);background:var(--accent-soft);font-size:14px}
+
+.wrap{display:grid;grid-template-columns:minmax(0,1.45fr) minmax(0,1fr);gap:16px;padding:16px;max-width:1400px;margin:0 auto}
+@media (max-width:900px){.wrap{grid-template-columns:minmax(0,1fr)}}
+.mapcard{background:var(--surface);border:1px solid var(--line);border-radius:14px;overflow:hidden;align-self:start}
+@media (min-width:901px){.mapcard{position:sticky;top:12px}}
+.maphead{display:flex;flex-wrap:wrap;align-items:center;gap:8px 14px;padding:10px 14px;border-bottom:1px solid var(--line)}
+.maphead h2{margin:0;font-family:var(--display);font-size:20px;font-weight:700;letter-spacing:.02em;text-transform:uppercase}
+.legend{display:flex;flex-wrap:wrap;gap:4px 12px;font-size:12.5px;color:var(--muted);margin-left:auto}
+.legend i{display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:5px;vertical-align:0}
+#map{height:min(68vh,640px);min-height:340px;background:var(--surface2);font-family:var(--body)}
+@media (max-width:900px){#map{height:58vh}}
+#map.picking{cursor:crosshair}
+.leaflet-container a{color:var(--accent)}
+.leaflet-control-attribution{font-size:10.5px}
+.mapfoot{display:flex;flex-wrap:wrap;gap:8px 14px;align-items:center;justify-content:space-between;padding:8px 14px;font-size:12.5px;color:var(--muted);border-top:1px solid var(--line)}
+.linkbtn{border:0;background:none;padding:0;color:var(--accent);font-weight:600;cursor:pointer;font-size:12.5px;text-decoration:underline;text-underline-offset:2px}
+.locbtn{display:inline-flex;align-items:center;gap:6px}
+.locbtn svg{width:15px;height:15px}
+
+.pinicon{background:none;border:0}
+.pinicon svg{display:block;filter:drop-shadow(0 1px 1.5px rgb(0 0 0/.45));overflow:visible}
+.pinicon path{stroke:#fff;stroke-width:2.2}
+.pinicon.sel path{stroke:#111;stroke-width:3}
+.pinicon.dim{opacity:.3}
+@media (prefers-reduced-motion:no-preference){.pinicon.draft svg{animation:bob 1.1s ease-in-out infinite}}
+@keyframes bob{50%{transform:translateY(-4px)}}
+
+.panel{display:flex;flex-direction:column;gap:14px;min-width:0}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:16px;min-width:0}
+.card h3{margin:0 0 4px;font-family:var(--display);font-weight:700;font-size:22px;letter-spacing:.01em;text-wrap:balance}
+.eyebrow{font-size:11.5px;font-weight:700;letter-spacing:.09em;text-transform:uppercase;color:var(--muted);margin:0 0 6px}
+.muted{color:var(--muted)}
+.small{font-size:13px}
+.stack{display:flex;flex-direction:column;gap:12px}
+.row{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+label.f{display:flex;flex-direction:column;gap:5px;font-weight:600;font-size:13.5px}
+select,textarea,input[type=text]{width:100%;background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:9px 10px;font-size:16px}
+textarea{min-height:92px;resize:vertical}
+.hint{font-weight:400;color:var(--muted);font-size:12.5px}
+.btn{border:1px solid var(--line);background:var(--surface);border-radius:9px;padding:9px 14px;font-weight:600;cursor:pointer;font-size:14px}
+.btn:hover{background:var(--surface2)}
+.btn.primary{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
+.btn.primary:hover{filter:brightness(1.06)}
+.btn.danger{color:var(--s-new)}
+.btn.sm{padding:6px 11px;font-size:13px}
+.btn[disabled]{opacity:.5;cursor:not-allowed}
+.photos{display:grid;grid-template-columns:repeat(auto-fill,minmax(84px,1fr));gap:8px}
+.photos .ph{position:relative;aspect-ratio:1;border-radius:8px;overflow:hidden;background:var(--surface2);border:0;padding:0;cursor:pointer;max-width:100%}
+.photos img{width:100%;height:100%;object-fit:cover;display:block}
+.photos .x{position:absolute;top:3px;right:3px;width:24px;height:24px;border-radius:50%;border:0;background:rgb(0 0 0/.6);color:#fff;font-weight:700;cursor:pointer;line-height:1}
+.addph{aspect-ratio:1;border:1.5px dashed var(--line);border-radius:8px;display:flex;align-items:center;justify-content:center;text-align:center;font-size:12.5px;font-weight:600;color:var(--muted);cursor:pointer;padding:6px}
+.addph input{display:none}
+.note{padding:9px 11px;border-radius:8px;background:var(--accent-soft);font-size:13px}
+
+.chip{display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:700;letter-spacing:.03em;text-transform:uppercase;padding:3px 9px;border-radius:999px;white-space:nowrap}
+.chip::before{content:"";width:7px;height:7px;border-radius:50%;background:currentColor}
+.st-new{color:var(--s-new);background:color-mix(in srgb,var(--s-new) 13%,transparent)}
+.st-received{color:var(--s-received);background:color-mix(in srgb,var(--s-received) 15%,transparent)}
+.st-progress{color:var(--s-progress);background:color-mix(in srgb,var(--s-progress) 13%,transparent)}
+.st-done{color:var(--s-done);background:color-mix(in srgb,var(--s-done) 14%,transparent)}
+
+.tally{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:6px}
+@media (max-width:420px){.tally{grid-template-columns:repeat(3,minmax(0,1fr))}}
+.tally button{border:1px solid var(--line);background:var(--bg);border-radius:10px;padding:8px 6px;text-align:left;cursor:pointer;min-width:0}
+.tally button[aria-pressed="true"]{border-color:var(--ink);background:var(--surface)}
+.tally b{display:block;font-family:var(--display);font-size:28px;line-height:1;font-variant-numeric:tabular-nums}
+.tally span{font-size:11.5px;font-weight:600;color:var(--muted);white-space:nowrap}
+
+.list{display:flex;flex-direction:column}
+.item{display:grid;grid-template-columns:auto minmax(0,1fr) auto;gap:4px 12px;align-items:start;text-align:left;width:100%;border:0;border-top:1px solid var(--line);background:none;padding:12px 2px;cursor:pointer}
+.item:first-child{border-top:0}
+.item:hover .t{text-decoration:underline}
+.item .num{font-family:var(--display);font-weight:700;font-size:15px;color:var(--muted);font-variant-numeric:tabular-nums;padding-top:1px}
+.item .t{font-weight:600}
+.item .d{grid-column:2/4;color:var(--muted);font-size:13.5px;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}
+.item .m{grid-column:2/4;font-size:12px;color:var(--muted)}
+.empty{padding:18px 4px;color:var(--muted);font-size:14px}
+.selrow{display:grid;grid-template-columns:auto minmax(0,1fr);align-items:start;gap:10px;border-top:1px solid var(--line)}
+.selrow:first-child{border-top:0}
+.selrow .item{border-top:0}
+.selrow input{margin-top:14px;width:19px;height:19px;accent-color:var(--accent);cursor:pointer}
+.sharecard{border-color:var(--accent)}
+.sharetext{min-height:140px;font-size:12.5px;font-family:ui-monospace,Menlo,Consolas,monospace}
+
+.statusbar{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:6px}
+@media (max-width:420px){.statusbar{grid-template-columns:repeat(2,minmax(0,1fr))}}
+.statusbar button{border:1.5px solid var(--line);background:var(--bg);border-radius:9px;padding:9px 4px;font-weight:700;font-size:13px;cursor:pointer}
+.statusbar button[aria-pressed="true"]{color:#fff;border-color:transparent}
+.statusbar button.s-new[aria-pressed="true"]{background:var(--s-new)}
+.statusbar button.s-received[aria-pressed="true"]{background:var(--s-received)}
+.statusbar button.s-progress[aria-pressed="true"]{background:var(--s-progress)}
+.statusbar button.s-done[aria-pressed="true"]{background:var(--s-done)}
+.timeline{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:6px;font-size:13px}
+.timeline li{display:flex;gap:10px;align-items:baseline;flex-wrap:wrap}
+.timeline time{color:var(--muted);font-variant-numeric:tabular-nums;min-width:118px}
+dl.kv{display:grid;grid-template-columns:auto minmax(0,1fr);gap:4px 14px;margin:0;font-size:13.5px}
+dl.kv dt{color:var(--muted)} dl.kv dd{margin:0;min-width:0;overflow-wrap:anywhere}
+.linkrow{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:8px;align-items:center}
+.linkrow input{font-size:13px;padding:7px 9px}
+
+.gate{max-width:520px;margin:12vh auto;padding:0 16px;text-align:center}
+.gate h1{font-family:var(--display);font-size:34px;margin:0 0 8px}
+.toast{position:fixed;left:50%;bottom:calc(18px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);background:var(--ink);color:var(--bg);padding:10px 16px;border-radius:10px;font-size:14px;font-weight:600;max-width:calc(100% - 32px);z-index:2000}
+.lightbox{position:fixed;inset:0;background:rgb(0 0 0/.85);display:flex;align-items:center;justify-content:center;padding:16px;z-index:3000;cursor:zoom-out}
+.lightbox img{max-height:100%;max-width:100%;border-radius:6px}
+.foot{padding:4px 16px 24px;max-width:1400px;margin:0 auto;font-size:12.5px;color:var(--muted)}
+</style>
+</head>
+<body>
+
+<div id="gate" class="gate" hidden>
+  <h1>McCune Park Pins</h1>
+  <p id="gatemsg" class="muted">Open this page from the link you were sent. The link includes the key that lets you in.</p>
+</div>
+
+<div id="app" hidden>
+<header class="top">
+  <div class="brand"><b>McCune Park Pins</b><span>McCune Family Park · 7450 Eastvale Pkwy · Pilot, not an official JCSD tool</span></div>
+  <div class="topright">
+    <div class="switch" id="switch" role="group" aria-label="View" hidden>
+      <button id="v-amb" aria-pressed="true">Ambassador</button>
+      <button id="v-staff" aria-pressed="false">JCSD staff</button>
+    </div>
+    <span class="viewlabel" id="viewlabel" hidden></span>
+  </div>
+</header>
+<div id="banner" class="banner" hidden></div>
+
+<main class="wrap">
+  <section class="mapcard" aria-label="Park map">
+    <div class="maphead">
+      <h2 id="maptitle">Tap where the problem is</h2>
+      <button class="linkbtn locbtn" id="locate" hidden><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" aria-hidden="true"><circle cx="12" cy="12" r="7"/><circle cx="12" cy="12" r="2.2" fill="currentColor"/><path d="M12 1v4M12 19v4M1 12h4M19 12h4"/></svg>Pin my location</button>
+      <div class="legend" aria-hidden="true">
+        <span><i style="background:var(--s-new)"></i>New</span>
+        <span><i style="background:var(--s-received)"></i>Received</span>
+        <span><i style="background:var(--s-progress)"></i>In progress</span>
+        <span><i style="background:var(--s-done)"></i>Done</span>
+      </div>
+    </div>
+    <div id="map"></div>
+    <div class="mapfoot"><span id="mapnote">Pinch or scroll to zoom. Drag a new pin to fine-tune it.</span><span id="sync" class="muted"></span></div>
+  </section>
+  <section class="panel" id="panel" aria-live="polite"></section>
+</main>
+<p class="foot">Pilot for collecting feedback. Reports and photos are visible to everyone with a link to this site.</p>
+</div>
+
+<div id="toast" class="toast" hidden></div>
+<div id="lightbox" class="lightbox" hidden><img id="lbimg" alt=""></div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<script>
+(function(){
+/* ---------- config ---------- */
+const SB_URL='https://ackyacnmhzrdevdmclia.supabase.co';
+const SB_KEY='sb_publishable_355C4FqVqzp6a5hjRZB8Jg_MBWGvKHs';   // publishable key: safe in the browser; the database functions check the link key
+const AERIAL='mccune-aerial.jpg';
+const AERIAL_BOUNDS=[[33.95120,-117.59337],[33.95592,-117.58577]];   // exact extent of the aerial export (Web Mercator)
+const PARK_VIEW=[[33.95190,-117.59095],[33.95488,-117.58760]];
+const POLL_MS=20000;
+
+const AREAS=[
+ ['open_field','Open field space','Turf, fencing, light poles'],
+ ['basketball','Basketball court','Surfacing, nets, backboard, light poles'],
+ ['ballfields','Baseball/softball fields','Dugouts, infield dirt, outfield turf, lights'],
+ ['tennis','Tennis courts','Nets, fencing, striping'],
+ ['shelter_n','Picnic shelter (north)','Columns, roof, lighting, benches'],
+ ['shelter_s','Picnic shelter (south)','Columns, roof, lighting, benches'],
+ ['play_small','Playground (2–5 years)','Surfacing, slides, play equipment'],
+ ['play_big','Playground (5–12 years)','Surfacing, slides, play equipment'],
+ ['restrooms','Restrooms','Sinks, toilets, partitions, lighting'],
+ ['sidewalks','Sidewalks','Around and within the park'],
+ ['lighting','Walkway lighting','Lights along walking paths'],
+ ['trash','Trash receptacles',''],
+ ['parking','Parking lot','Striping, signage'],
+ ['graffiti','Graffiti',''],
+ ['vandalism','Vandalism','Damage to other areas of the park'],
+ ['landscaping','General landscaping','Planters, turf'],
+ ['amenities','Amenities','Water fountains, benches'],
+ ['other','Other','']
+];
+const AREA=Object.fromEntries(AREAS.map(a=>[a[0],a]));
+const STATUS={new:'New',received:'Received',progress:'In progress',done:'Done'};
+
+const S={token:null,role:null,label:'',links:null,view:'amb',issues:[],loaded:false,draft:null,sel:null,filter:'all',period:'this',
+ busy:false,confirmDel:false,editNote:null,picked:null,lastSync:null};
+const $=id=>document.getElementById(id);
+const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const code=id=>id?id.replace(/[^a-z0-9]/gi,'').slice(-4).toUpperCase():'';
+const fmt=iso=>{if(!iso)return'';const d=new Date(iso);return d.toLocaleDateString(undefined,{month:'short',day:'numeric'})+', '+d.toLocaleTimeString(undefined,{hour:'numeric',minute:'2-digit'})};
+const fmtDate=iso=>iso?new Date(iso).toLocaleDateString('en-US',{month:'numeric',day:'numeric',year:'numeric'}):'';
+const now=()=>new Date().toISOString();
+const who=x=>x||'Ambassador';
+const hasLL=i=>typeof i.lat==='number'&&typeof i.lng==='number';
+const mapsLink=i=>`https://www.google.com/maps/search/?api=1&query=${i.lat.toFixed(6)},${i.lng.toFixed(6)}`;
+const photoURL=p=>`${SB_URL}/storage/v1/object/public/photos/${p}`;
+const canStaff=()=>S.role==='owner'||S.role==='staff';
+const canReport=()=>S.role==='owner'||S.role==='ambassador';
+
+let toastT;
+function toast(msg){const t=$('toast');t.textContent=msg;t.hidden=false;clearTimeout(toastT);toastT=setTimeout(()=>t.hidden=true,3600)}
+function banner(msg){const b=$('banner');b.textContent=msg||'';b.hidden=!msg}
+
+/* ---------- backend ---------- */
+async function rpc(fn,args){
+ const r=await fetch(`${SB_URL}/rest/v1/rpc/${fn}`,{method:'POST',headers:{apikey:SB_KEY,'Content-Type':'application/json'},body:JSON.stringify(args)});
+ const t=await r.text();let j=null;try{j=t?JSON.parse(t):null}catch{}
+ if(!r.ok){const e=new Error((j&&(j.message||j.msg||j.error))||`Request failed (${r.status})`);e.status=r.status;e.code=j&&j.code;throw e}
+ return j;
+}
+function uuid(){
+ if(crypto.randomUUID)return crypto.randomUUID();
+ const b=crypto.getRandomValues(new Uint8Array(16));b[6]=b[6]&15|64;b[8]=b[8]&63|128;
+ const h=[...b].map(x=>x.toString(16).padStart(2,'0')).join('');
+ return `${h.slice(0,8)}-${h.slice(8,12)}-${h.slice(12,16)}-${h.slice(16,20)}-${h.slice(20)}`;
+}
+async function uploadPhoto(blob){
+ const name=`mccune/${uuid()}.jpg`;
+ const r=await fetch(`${SB_URL}/storage/v1/object/photos/${name}`,{method:'POST',headers:{apikey:SB_KEY,'Content-Type':'image/jpeg','x-upsert':'false'},body:blob});
+ if(!r.ok){let m='';try{m=(await r.json()).message}catch{}throw new Error(m||`Photo upload failed (${r.status})`)}
+ return name;
+}
+const norm=r=>({id:r.id,lat:r.lat,lng:r.lng,area:r.area,note:r.note||'',photos:r.photos||[],status:r.status,reportedBy:r.reported_by,
+ reportedAt:r.reported_at,updatedAt:r.updated_at,doneAt:r.done_at,sharedAt:r.shared_at,staffNote:r.staff_note||'',history:r.history||[]});
+function upsertLocal(row){if(!row||!row.id)return;const n=norm(row),ix=S.issues.findIndex(i=>i.id===n.id);if(ix>=0)S.issues[ix]=n;else S.issues.unshift(n)}
+let loading=false;
+async function load(){
+ if(loading)return;loading=true;
+ try{
+  const rows=await rpc('list_issues',{p_token:S.token});
+  S.issues=(rows||[]).map(norm);S.loaded=true;S.lastSync=new Date();
+  if(S.sel&&!S.issues.some(i=>i.id===S.sel))S.sel=null;
+  banner('');softRender();
+ }catch(e){banner(e.status>=400&&e.status<500?e.message:'Can’t reach the server. Showing the last loaded reports; retrying.')}
+ finally{loading=false;$('sync').textContent=S.lastSync?'Updated '+S.lastSync.toLocaleTimeString(undefined,{hour:'numeric',minute:'2-digit'}):''}
+}
+
+/* ---------- map ---------- */
+let map=null,pinLayer=null,draftMarker=null,accCircle=null;
+function initMap(){
+ if(!window.L){banner('The map could not load. Check your connection and reload.');return}
+ map=L.map('map',{zoomSnap:.25,maxZoom:21,minZoom:14});
+ map.attributionControl.setPrefix(false);
+ // The saved aerial sits underneath the live tiles, so the park still shows if tiles are slow or blocked.
+ map.createPane('aerial');map.getPane('aerial').style.zIndex=150;
+ L.imageOverlay(AERIAL,AERIAL_BOUNDS,{pane:'aerial',interactive:false}).addTo(map);
+ L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
+  {maxNativeZoom:19,maxZoom:21,attribution:'Imagery © Esri, Maxar, Earthstar Geographics'}).addTo(map);
+ map.fitBounds(PARK_VIEW);
+ map.setMaxBounds(L.latLngBounds(AERIAL_BOUNDS).pad(1.5));
+ pinLayer=L.layerGroup().addTo(map);
+ map.on('click',e=>{if(S.view==='amb'&&canReport())startDraft(e.latlng.lat,e.latlng.lng)});
+ new ResizeObserver(()=>map.invalidateSize()).observe($('map'));
+}
+function startDraft(lat,lng){
+ const keep=S.draft||{note:'',files:[],area:''};
+ S.draft={...keep,lat,lng};S.sel=null;render();
+}
+const COL={new:'--s-new',received:'--s-received',progress:'--s-progress',done:'--s-done'};
+const cssVar=n=>getComputedStyle(document.documentElement).getPropertyValue(n).trim()||'#888';
+function pinIcon(color,cls,size=30){
+ const h=size,w=Math.round(size*.78);
+ return L.divIcon({className:'pinicon '+cls,iconSize:[w,h],iconAnchor:[w/2,h],
+  html:`<svg width="${w}" height="${h}" viewBox="-14 -40 28 40"><path d="M0 0 C-9 -12 -13 -18 -13 -26 A13 13 0 1 1 13 -26 C13 -18 9 -12 0 0 Z" fill="${color}"/><circle cx="0" cy="-26" r="4.6" fill="#fff"/></svg>`});
+}
+function pinVisible(i){return S.view==='amb'||S.filter==='all'||i.status===S.filter}
+function drawPins(){
+ if(!map)return;
+ pinLayer.clearLayers();
+ const order=[...S.issues].filter(hasLL).sort((a,b)=>(a.status==='done')-(b.status==='done')||b.lat-a.lat);
+ for(const i of order){
+  const sel=S.sel===i.id;
+  const m=L.marker([i.lat,i.lng],{icon:pinIcon(cssVar(COL[i.status]||COL.new),(sel?'sel':'')+(pinVisible(i)?'':' dim'),sel?38:30),
+   keyboard:true,title:`#${code(i.id)} ${AREA[i.area]?.[1]||'Report'} (${STATUS[i.status]||''})`,zIndexOffset:sel?1000:0});
+  m.on('click',()=>select(i.id));
+  m.addTo(pinLayer);
+ }
+ if(S.draft){
+  if(!draftMarker){
+   draftMarker=L.marker([S.draft.lat,S.draft.lng],{icon:pinIcon(cssVar('--accent'),'draft',38),draggable:true,zIndexOffset:2000,title:'New pin'});
+   draftMarker.on('dragend',()=>{const p=draftMarker.getLatLng();if(S.draft){S.draft.lat=p.lat;S.draft.lng=p.lng}});
+   draftMarker.addTo(map);
+  }else draftMarker.setLatLng([S.draft.lat,S.draft.lng]);
+ }else if(draftMarker){map.removeLayer(draftMarker);draftMarker=null}
+ $('map').classList.toggle('picking',S.view==='amb'&&canReport());
+}
+function select(id){
+ S.sel=id;clearDraft();S.confirmDel=false;S.editNote=null;render();
+ const i=S.issues.find(x=>x.id===id);
+ if(map&&i&&hasLL(i)&&!map.getBounds().pad(-.1).contains([i.lat,i.lng]))map.panTo([i.lat,i.lng]);
+ if(matchMedia('(max-width:900px)').matches)$('panel').scrollIntoView({behavior:'smooth',block:'start'});
+}
+$('locate').addEventListener('click',()=>{
+ if(!navigator.geolocation){toast('This browser can’t share your location.');return}
+ toast('Finding your location…');
+ navigator.geolocation.getCurrentPosition(p=>{
+  const {latitude:lat,longitude:lng,accuracy}=p.coords;
+  if(accCircle)map.removeLayer(accCircle);
+  accCircle=L.circle([lat,lng],{radius:accuracy,weight:1,color:cssVar('--s-progress'),fillOpacity:.12,interactive:false}).addTo(map);
+  map.setView([lat,lng],Math.max(map.getZoom(),19));
+  startDraft(lat,lng);
+  const far=!L.latLngBounds(AERIAL_BOUNDS).contains([lat,lng]);
+  toast(far?'You look to be away from McCune Park. Drag the pin if needed.':`Pinned within about ${Math.round(accuracy*3.28)} ft. Drag the pin to fine-tune.`);
+ },err=>{
+  toast(err.code===1?'Location is blocked. Allow location for this site in your browser settings, or tap the map instead.':'Couldn’t get your location. Tap the map instead.');
+ },{enableHighAccuracy:true,timeout:15000,maximumAge:10000});
+});
+
+/* ---------- panel ---------- */
+function chip(s){return `<span class="chip st-${esc(s)}">${esc(STATUS[s]||s)}</span>`}
+function photoGrid(ids){return ids&&ids.length?`<div class="photos">${ids.map(p=>`<button class="ph" data-photo="${esc(p)}" aria-label="Open photo"><img src="${esc(photoURL(p))}" alt="Reported photo" loading="lazy"></button>`).join('')}</div>`:''}
+function itemRow(i){
+ return `<button class="item" data-open="${esc(i.id)}">
+  <span class="num">#${code(i.id)}</span><span class="t">${esc(AREA[i.area]?.[1]||'Report')}</span>${chip(i.status)}
+  <span class="d">${esc(i.note||'(photo only)')}</span>
+  <span class="m">${fmt(i.reportedAt)}${i.photos?.length?` · ${i.photos.length} photo${i.photos.length>1?'s':''}`:''}${S.view==='staff'?' · '+esc(who(i.reportedBy)):''}${hasLL(i)?'':' · no map location'}</span></button>`;
+}
+function renderDraft(){
+ const d=S.draft;
+ const opts=AREAS.map(([k,l,desc])=>`<option value="${k}" ${d.area===k?'selected':''}>${esc(l)}${desc?' — '+esc(desc):''}</option>`).join('');
+ const thumbs=d.files.map((f,ix)=>`<div class="ph"><img src="${f.url}" alt="Selected photo ${ix+1}"><button class="x" data-rm="${ix}" aria-label="Remove photo">×</button></div>`).join('');
+ return `<div class="card stack">
+  <div><p class="eyebrow">New report</p><h3>What needs attention?</h3>
+  <p class="muted small" style="margin:0">Pin dropped. Drag it, or tap the map again, to move it.</p></div>
+  <label class="f" for="f-area">Area<select id="f-area"><option value="">Choose an area…</option>${opts}</select></label>
+  ${d.area==='graffiti'?`<p class="note">JCSD asks that graffiti also be reported right away through the My JCSD app or at <a href="https://www.jcsd.us/HowDoI/ReportGraffiti/" target="_blank" rel="noopener">jcsd.us</a>.</p>`:''}
+  <label class="f" for="f-note">Describe what needs attention<textarea id="f-note" placeholder="e.g. Net on court 2 is torn at the center strap">${esc(d.note)}</textarea></label>
+  <div style="display:flex;flex-direction:column;gap:6px;font-weight:600;font-size:13.5px">Photos <span class="hint">Optional. Take a new one or choose from your library.</span>
+   <div class="photos">${thumbs}<label class="addph" for="f-photos">+ Add photo<input id="f-photos" type="file" accept="image/*" multiple></label></div></div>
+  <div class="row"><button class="btn primary" id="f-submit" ${S.busy?'disabled':''}>${S.busy?'Sending…':'Send report'}</button><button class="btn" id="f-cancel" ${S.busy?'disabled':''}>Cancel</button></div>
+ </div>`;
+}
+function renderDetail(i){
+ const staff=S.view==='staff'&&canStaff();
+ const hist=(i.history||[]).slice().reverse().map(h=>`<li><time>${fmt(h.at)}</time>${chip(h.s)}<span class="muted">${esc(who(h.by))}</span></li>`).join('');
+ const noteVal=S.editNote!==null?S.editNote:(i.staffNote||'');
+ return `<div class="card stack">
+  <div class="row" style="justify-content:space-between"><button class="linkbtn" id="d-back">← All reports</button>${chip(i.status)}</div>
+  <div><p class="eyebrow">Report #${code(i.id)}</p><h3>${esc(AREA[i.area]?.[1]||'Report')}</h3>
+   <p style="margin:6px 0 0;white-space:pre-wrap">${esc(i.note||'(No description, photo only.)')}</p></div>
+  ${photoGrid(i.photos)}
+  <dl class="kv"><dt>Reported</dt><dd>${fmt(i.reportedAt)} by ${esc(who(i.reportedBy))}</dd>
+   <dt>Location</dt><dd>${hasLL(i)?`${i.lat.toFixed(5)}, ${i.lng.toFixed(5)} · <a href="${mapsLink(i)}" target="_blank" rel="noopener">Open in Google Maps</a>`:'Not on the map'}</dd>
+   ${i.sharedAt&&S.view==='staff'?`<dt>Shared with rangers</dt><dd>${fmt(i.sharedAt)}</dd>`:''}
+   ${i.doneAt?`<dt>Completed</dt><dd>${fmt(i.doneAt)}</dd>`:''}
+   ${!staff&&i.staffNote?`<dt>JCSD note</dt><dd style="white-space:pre-wrap">${esc(i.staffNote)}</dd>`:''}</dl>
+  ${staff?`<div class="stack" style="gap:8px"><p class="eyebrow" style="margin:0">Set status</p>
+   <div class="statusbar">${Object.keys(STATUS).map(s=>`<button class="s-${s}" data-status="${s}" aria-pressed="${i.status===s}">${STATUS[s]}</button>`).join('')}</div></div>
+   <label class="f" for="d-note">Note to the ambassador <span class="hint">Appears in the Notes column of the monthly report</span><textarea id="d-note" style="min-height:64px">${esc(noteVal)}</textarea></label>
+   <div class="row"><button class="btn" id="d-savenote">Save note</button>
+   <button class="btn danger" id="d-del" style="margin-left:auto">${S.confirmDel?'Tap again to delete':'Delete report'}</button></div>`:''}
+  ${hist?`<div><p class="eyebrow">History</p><ul class="timeline">${hist}</ul></div>`:''}
+ </div>`;
+}
+function renderLinks(){
+ if(S.role!=='owner'||!S.links)return'';
+ const base=location.origin+location.pathname;
+ const row=(id,label,url)=>`<label class="f" for="${id}">${label}<div class="linkrow"><input type="text" id="${id}" readonly value="${esc(url)}"><button class="btn sm" data-copy="${id}">Copy</button></div></label>`;
+ return `<div class="card stack"><div><p class="eyebrow">Links to share</p><h3>Send these links</h3>
+  <p class="muted small" style="margin:0">No sign-in needed. Anyone with a link can use it, so share each one only with the person it's for.</p></div>
+  ${S.links.staff?row('lk-staff','JCSD staff (status, notes, reports, ranger sheets)',`${base}#k=${S.links.staff}`):''}
+  ${S.links.ambassador?row('lk-amb','Park ambassador (drop pins, follow status)',`${base}#k=${S.links.ambassador}`):''}
+ </div>`;
+}
+function counts(){const c={all:S.issues.length,new:0,received:0,progress:0,done:0};for(const i of S.issues)c[i.status]=(c[i.status]||0)+1;return c}
+function render(){
+ $('v-amb').setAttribute('aria-pressed',S.view==='amb');$('v-staff').setAttribute('aria-pressed',S.view==='staff');
+ $('maptitle').textContent=S.view==='amb'?(canReport()?'Tap where the problem is':'Park map'):'Reported pins';
+ $('locate').hidden=!(S.view==='amb'&&canReport());
+ const sel=S.sel&&S.issues.find(i=>i.id===S.sel);
+ let html='';
+ if(S.view==='amb'){
+  if(S.draft)html=renderDraft();
+  else if(sel)html=renderDetail(sel);
+  else{
+   html=`<div class="card"><p class="eyebrow">Park walk</p><h3>Drop a pin for each problem</h3>
+    <p class="muted" style="margin:4px 0 0">Tap the spot on the map, or use <b>Pin my location</b> while you're standing at it. Choose the area, describe it and add photos. JCSD sees it right away and you can follow its status here.</p></div>
+    <div class="card"><p class="eyebrow">Reports · ${S.issues.length}</p>
+     <div class="list">${S.issues.length?S.issues.map(itemRow).join(''):`<p class="empty">${S.loaded?'No reports yet. Your first pin will show up here with its status.':'Loading reports…'}</p>`}</div></div>`;
+   html+=renderLinks();
+  }
+ }else{
+  const c=counts();
+  const tally=[['all','All'],['new','New'],['received','Received'],['progress','In progress'],['done','Done']]
+   .map(([k,l])=>`<button data-filter="${k}" aria-pressed="${S.filter===k}"><b>${c[k]||0}</b><span>${l}</span></button>`).join('');
+  const list=S.issues.filter(i=>S.filter==='all'||i.status===S.filter);
+  html=`<div class="card stack" style="gap:10px"><p class="eyebrow" style="margin:0">Status</p><div class="tally">${tally}</div></div>`;
+  html+=renderShare(c);
+  html+=sel?renderDetail(sel):`<div class="card"><p class="eyebrow">${S.filter==='all'?'All reports':esc(STATUS[S.filter])} · ${list.length}</p>
+   <div class="list">${list.length?list.map(pickRow).join(''):`<p class="empty">${S.loaded?'Nothing here.':'Loading reports…'}</p>`}</div></div>`;
+  html+=`<div class="card stack"><div><p class="eyebrow">Monthly report</p><h3>Ambassador Submission Report</h3>
+   <p class="muted small" style="margin:0">Same layout as the report JCSD emails today: totals by status, a pie chart, and every submission with its status and notes. Photos are included at the end.</p></div>
+   <label class="f" for="r-period">Month<select id="r-period">
+    <option value="this" ${S.period==='this'?'selected':''}>${periodOf('this').label}</option>
+    <option value="last" ${S.period==='last'?'selected':''}>${periodOf('last').label}</option>
+    <option value="all" ${S.period==='all'?'selected':''}>All submissions</option></select></label>
+   <div class="row"><button class="btn primary" id="r-html">Download report</button><button class="btn" id="r-csv">Spreadsheet (.csv)</button></div>
+   <p class="muted small" style="margin:0">The report opens in any browser. Print it or save it as a PDF to email.</p></div>`;
+  if(S.role==='owner')html+=renderLinks();
+ }
+ $('panel').innerHTML=html;
+ drawPins();
+}
+
+/* ---------- panel events ---------- */
+$('panel').addEventListener('click',async e=>{
+ const t=e.target;
+ const open=t.closest('[data-open]');if(open){select(open.dataset.open);return}
+ const ph=t.closest('[data-photo]');if(ph){$('lbimg').src=photoURL(ph.dataset.photo);$('lightbox').hidden=false;return}
+ const rm=t.closest('[data-rm]');if(rm){const f=S.draft.files.splice(+rm.dataset.rm,1)[0];if(f)URL.revokeObjectURL(f.url);render();return}
+ const fl=t.closest('[data-filter]');if(fl){S.filter=fl.dataset.filter;S.sel=null;render();return}
+ const st=t.closest('[data-status]');if(st){setStatus(st.dataset.status);return}
+ const ps=t.closest('[data-pickset]');if(ps){pickSet(ps.dataset.pickset);return}
+ const cp=t.closest('[data-copy]');if(cp){copyText($(cp.dataset.copy).value,'Link copied.',$(cp.dataset.copy));return}
+ if(t.matches('[data-pick]'))return;
+ switch(t.id){
+  case 'd-back':S.sel=null;S.editNote=null;S.confirmDel=false;render();break;
+  case 'f-cancel':clearDraft();render();break;
+  case 'f-submit':submit();break;
+  case 'd-savenote':saveNote();break;
+  case 'd-del':if(!S.confirmDel){S.confirmDel=true;render()}else delIssue();break;
+  case 'r-html':downloadReport('html');break;
+  case 'r-csv':downloadReport('csv');break;
+  case 'sh-html':shareDownload();break;
+  case 'sh-copy':shareCopy();break;
+  case 'sh-mark':markReceived();break;
+ }
+});
+$('panel').addEventListener('input',e=>{
+ if(e.target.id==='f-note'&&S.draft)S.draft.note=e.target.value;
+ if(e.target.id==='d-note')S.editNote=e.target.value;
+});
+$('panel').addEventListener('change',e=>{
+ const t=e.target;
+ if(t.id==='f-area'&&S.draft){S.draft.area=t.value;render()}
+ if(t.id==='r-period'){S.period=t.value}
+ if(t.matches('[data-pick]')){setPick(t.dataset.pick,t.checked);return}
+ if(t.id==='f-photos'&&S.draft){for(const f of t.files)S.draft.files.push({file:f,url:URL.createObjectURL(f)});render()}
+});
+$('lightbox').addEventListener('click',()=>{$('lightbox').hidden=true;$('lbimg').removeAttribute('src')});
+document.addEventListener('keydown',e=>{if(e.key==='Escape'&&!$('lightbox').hidden)$('lightbox').click()});
+function clearDraft(){if(S.draft)S.draft.files.forEach(f=>URL.revokeObjectURL(f.url));S.draft=null}
+function copyText(text,okMsg,selectEl){
+ const fallback=()=>{if(selectEl){selectEl.hidden=false;selectEl.focus();selectEl.select()}toast('Select the text and copy it.')};
+ try{navigator.clipboard.writeText(text).then(()=>toast(okMsg),fallback)}catch{fallback()}
+}
+
+/* view switching (owner only); the address bar follows the view */
+function setHashView(v){
+ try{history.replaceState(null,'',`#k=${encodeURIComponent(S.token)}${S.role==='owner'?(v==='staff'?'&v=jcsd':'&v=ambassador'):''}`)}catch{}
+}
+function goView(v){
+ if(v==='staff')clearDraft();
+ S.view=v;S.sel=null;S.confirmDel=false;S.editNote=null;setHashView(v);render();
+}
+$('v-amb').onclick=()=>goView('amb');
+$('v-staff').onclick=()=>goView('staff');
+
+/* ---------- writes ---------- */
+async function shrink(file,max=1600){
+ const url=URL.createObjectURL(file);
+ try{
+  const img=await new Promise((res,rej)=>{const i=new Image();i.onload=()=>res(i);i.onerror=()=>rej(new Error('That file isn’t a photo this browser can read.'));i.src=url});
+  let w=img.naturalWidth,h=img.naturalHeight;const k=Math.min(1,max/Math.max(w,h));w=Math.round(w*k);h=Math.round(h*k);
+  const c=document.createElement('canvas');c.width=w;c.height=h;c.getContext('2d').drawImage(img,0,0,w,h);
+  return await new Promise(r=>c.toBlob(r,'image/jpeg',.82));
+ }finally{URL.revokeObjectURL(url)}
+}
+async function submit(){
+ const d=S.draft;if(!d||S.busy)return;
+ if(!d.area){toast('Choose an area for this report.');return}
+ if(!d.note.trim()&&!d.files.length){toast('Add a description or a photo.');return}
+ S.busy=true;render();
+ try{
+  const names=[];
+  for(const f of d.files)names.push(await uploadPhoto(await shrink(f.file)));
+  const row=await rpc('submit_issue',{p_token:S.token,p_lat:+d.lat.toFixed(7),p_lng:+d.lng.toFixed(7),p_area:d.area,p_note:d.note.trim(),p_photos:names});
+  upsertLocal(row);clearDraft();S.sel=row.id;toast('Report sent to JCSD.');
+ }catch(err){toast('The report was not sent. '+(err.message||'Check your connection and try again.'))}
+ finally{S.busy=false;render()}
+}
+async function setStatus(s){
+ const i=S.issues.find(x=>x.id===S.sel);if(!i||i.status===s)return;
+ try{upsertLocal(await rpc('set_status',{p_token:S.token,p_id:i.id,p_status:s}));toast('Marked '+STATUS[s].toLowerCase()+'.');render()}
+ catch(err){toast('Status was not saved. '+err.message)}
+}
+async function saveNote(){
+ const i=S.issues.find(x=>x.id===S.sel);if(!i)return;
+ const v=(S.editNote??i.staffNote??'').trim();
+ try{upsertLocal(await rpc('save_note',{p_token:S.token,p_id:i.id,p_note:v}));S.editNote=null;toast('Note saved.');render()}
+ catch(err){toast('Note was not saved. '+err.message)}
+}
+async function delIssue(){
+ const i=S.issues.find(x=>x.id===S.sel);if(!i)return;
+ try{await rpc('delete_issue',{p_token:S.token,p_id:i.id});S.issues=S.issues.filter(x=>x.id!==i.id);S.sel=null;S.confirmDel=false;toast('Report deleted.');render()}
+ catch(err){toast('The report was not deleted. '+err.message)}
+}
+
+/* ---------- files ---------- */
+function saveFile(filename,data,type){
+ const blob=data instanceof Blob?data:new Blob([data],{type});
+ const url=URL.createObjectURL(blob),a=document.createElement('a');
+ a.href=url;a.download=filename;document.body.appendChild(a);a.click();a.remove();
+ setTimeout(()=>URL.revokeObjectURL(url),60000);
+}
+async function toDataURL(src){
+ try{const r=await fetch(src);if(!r.ok)return null;const b=await r.blob();
+  return await new Promise(res=>{const fr=new FileReader();fr.onload=()=>res(fr.result);fr.onerror=()=>res(null);fr.readAsDataURL(b)})}catch{return null}
+}
+function csvCell(v){v=String(v??'');return /[",\n]/.test(v)?'"'+v.replace(/"/g,'""')+'"':v}
+
+/* ---------- share with rangers ---------- */
+function pickedIds(){
+ const ids=S.picked?[...S.picked]:S.issues.filter(i=>i.status==='new').map(i=>i.id);
+ const have=new Set(S.issues.map(i=>i.id));
+ return ids.filter(id=>have.has(id));
+}
+function pickedIssues(){const p=new Set(pickedIds());return S.issues.filter(i=>p.has(i.id)).sort((a,b)=>a.reportedAt<b.reportedAt?-1:1)}
+function pickRow(i){
+ const on=pickedIds().includes(i.id);
+ return `<div class="selrow"><input type="checkbox" id="pick-${esc(i.id)}" data-pick="${esc(i.id)}" ${on?'checked':''} aria-label="Include report #${code(i.id)} in the ranger list">${itemRow(i)}</div>`;
+}
+function renderShare(c){
+ const picked=pickedIssues(),n=picked.length,newN=picked.filter(i=>i.status==='new').length;
+ const open=S.issues.filter(i=>i.status!=='done').length;
+ return `<div class="card stack sharecard">
+  <div><p class="eyebrow">Share with park rangers</p><h3>${n} report${n===1?'':'s'} selected</h3>
+   <p class="muted small" style="margin:0">Tick reports in the list. New reports are selected to start. The ranger sheet includes photos and an aerial close-up of each spot, so rangers don't need this site.</p></div>
+  <div class="row"><button class="btn sm" data-pickset="new">All new (${c.new||0})</button><button class="btn sm" data-pickset="open">All open (${open})</button><button class="btn sm" data-pickset="none">Clear</button></div>
+  <div class="row">
+   <button class="btn primary" id="sh-html" ${n?'':'disabled'}>Download ranger sheet</button>
+   <button class="btn" id="sh-copy" ${n?'':'disabled'}>Copy as text</button>
+   ${newN?`<button class="btn" id="sh-mark">Mark ${newN} new as received</button>`:''}
+  </div>
+  <textarea id="sh-text" class="sharetext" readonly hidden aria-label="Ranger list as text"></textarea>
+ </div>`;
+}
+function setPick(id,on){const s=new Set(pickedIds());on?s.add(id):s.delete(id);S.picked=s;render()}
+function pickSet(kind){
+ if(kind==='none')S.picked=new Set();
+ else if(kind==='new')S.picked=null;
+ else S.picked=new Set(S.issues.filter(i=>i.status!=='done').map(i=>i.id));
+ render();
+}
+function shareText(list){
+ const d=new Date().toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'});
+ const lines=[`McCune Family Park (7450 Eastvale Pkwy) – ${list.length} report${list.length===1?'':'s'} to check – ${d}`,''];
+ list.forEach((i,ix)=>{
+  lines.push(`${ix+1}. ${AREA[i.area]?.[1]||'Report'} (#${code(i.id)}) – ${STATUS[i.status]}`);
+  lines.push(`   ${i.note||'(No description, see photo.)'}`);
+  lines.push(`   Reported ${fmt(i.reportedAt)}`);
+  if(hasLL(i))lines.push(`   Location: ${mapsLink(i)}`);
+  for(const p of i.photos||[])lines.push(`   Photo: ${photoURL(p)}`);
+  if(i.staffNote)lines.push(`   JCSD note: ${i.staffNote}`);
+  lines.push('');
+ });
+ return lines.join('\n').trim();
+}
+let aerialP=null;
+function loadAerial(){
+ if(!aerialP)aerialP=new Promise(res=>{const im=new Image();im.onload=()=>res(im);im.onerror=()=>res(null);im.src=AERIAL});
+ return aerialP;
+}
+const mercY=lat=>Math.log(Math.tan(Math.PI/4+lat*Math.PI/360));
+async function aerialCrop(i){
+ if(!hasLL(i))return null;
+ const im=await loadAerial();if(!im)return null;
+ const [[s,w],[n,e]]=AERIAL_BOUNDS,W=im.naturalWidth,H=im.naturalHeight;
+ const px=(i.lng-w)/(e-w)*W,py=(mercY(n)-mercY(i.lat))/(mercY(n)-mercY(s))*H;
+ if(px<0||py<0||px>W||py>H)return null;
+ const cw=440,ch=300,sx=Math.min(Math.max(px-cw/2,0),W-cw),sy=Math.min(Math.max(py-ch/2,0),H-ch);
+ const cv=document.createElement('canvas');cv.width=cw;cv.height=ch;const g=cv.getContext('2d');
+ g.drawImage(im,sx,sy,cw,ch,0,0,cw,ch);
+ const x=px-sx,y=py-sy;
+ g.beginPath();g.arc(x,y,22,0,Math.PI*2);g.lineWidth=4;g.strokeStyle='#fff';g.stroke();
+ g.beginPath();g.arc(x,y,22,0,Math.PI*2);g.lineWidth=2;g.strokeStyle='#d62d20';g.stroke();
+ g.beginPath();g.arc(x,y,5,0,Math.PI*2);g.fillStyle='#d62d20';g.fill();g.lineWidth=2;g.strokeStyle='#fff';g.stroke();
+ return cv.toDataURL('image/jpeg',.82);
+}
+function rangerHTML(list,uris,crops){
+ const d=new Date().toLocaleDateString('en-US',{weekday:'long',month:'long',day:'numeric',year:'numeric'});
+ const card=(i,ix)=>`<article>
+  <header><span class="ix">${ix+1}</span><div><h2>${esc(AREA[i.area]?.[1]||'Report')}</h2><p class="meta">#${code(i.id)} · Reported ${fmt(i.reportedAt)} · ${esc(STATUS[i.status])}</p></div><span class="box">Done ☐</span></header>
+  <p class="desc">${esc(i.note||'(No description, see photo.)')}</p>
+  ${i.staffNote?`<p class="jn"><b>JCSD note:</b> ${esc(i.staffNote)}</p>`:''}
+  <div class="vis">${crops[i.id]?`<figure><img src="${crops[i.id]}" alt="Aerial view with the reported spot circled"><figcaption>Spot circled in red</figcaption></figure>`:''}
+   ${(i.photos||[]).filter(p=>uris[p]).map(p=>`<figure><img src="${uris[p]}" alt="Reported photo"><figcaption>Ambassador photo</figcaption></figure>`).join('')}</div>
+  ${hasLL(i)?`<p class="loc">Location: <a href="${mapsLink(i)}">${i.lat.toFixed(5)}, ${i.lng.toFixed(5)} (open in Google Maps)</a></p>`:''}
+  <p class="notes">Ranger notes: ____________________________________________</p>
+ </article>`;
+ return `<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>McCune Family Park · Ranger list · ${esc(d)}</title>
+<style>@page{margin:12mm}
+body{font-family:"Helvetica Neue",Arial,sans-serif;color:#111;max-width:820px;margin:0 auto;padding:24px 16px;line-height:1.4}
+h1{font-size:28px;margin:0}.sub{color:#555;margin:4px 0 18px}
+article{border:1.5px solid #111;border-radius:8px;padding:14px 16px;margin:14px 0;break-inside:avoid}
+header{display:flex;gap:12px;align-items:flex-start}.ix{font-size:22px;font-weight:800;min-width:28px}
+h2{margin:0;font-size:19px}.meta{margin:2px 0 0;color:#555;font-size:13px}.box{margin-left:auto;font-weight:700;white-space:nowrap}
+.desc{font-size:16px;margin:10px 0}.jn{background:#f3f0e6;padding:6px 9px;border-radius:6px;font-size:14px}
+.vis{display:flex;flex-wrap:wrap;gap:10px}figure{margin:0}figure img{width:260px;height:178px;object-fit:cover;border-radius:6px;border:1px solid #bbb;display:block}
+figcaption{font-size:11.5px;color:#555;margin-top:3px}.loc{font-size:13.5px}.loc a{color:#0b5cad}.notes{color:#777;font-size:13px;margin-bottom:0}
+.foot{color:#777;font-size:11.5px;margin-top:24px}</style></head><body>
+<h1>McCune Family Park — ranger work list</h1>
+<p class="sub">7450 Eastvale Pkwy, Eastvale · ${esc(d)} · ${list.length} report${list.length===1?'':'s'}</p>
+${list.map(card).join('')}
+<p class="foot">From McCune Park Pins. Report numbers (#) match the JCSD tracker.</p></body></html>`;
+}
+async function shareDownload(){
+ const list=pickedIssues();if(!list.length)return;
+ toast('Preparing ranger sheet…');
+ const uris={},crops={};
+ for(const p of new Set(list.flatMap(i=>i.photos||[])))uris[p]=await toDataURL(photoURL(p));
+ for(const i of list)crops[i.id]=await aerialCrop(i).catch(()=>null);
+ saveFile(`McCune-Park-ranger-list-${new Date().toISOString().slice(0,10)}.html`,rangerHTML(list,uris,crops),'text/html');
+ stampShared(list);
+}
+function shareCopy(){
+ const list=pickedIssues();if(!list.length)return;
+ const text=shareText(list),ta=$('sh-text');ta.value=text;
+ const fallback=()=>{ta.hidden=false;ta.focus();ta.select();toast('Select the text below and copy it.')};
+ try{navigator.clipboard.writeText(text).then(()=>{toast('Copied. Paste it into an email or text.');stampShared(list)},fallback)}catch{fallback()}
+}
+async function stampShared(list){
+ try{await rpc('mark_shared',{p_token:S.token,p_ids:list.map(i=>i.id)});const at=now();for(const i of list)i.sharedAt=at}catch{}
+}
+async function markReceived(){
+ const list=pickedIssues().filter(i=>i.status==='new');if(!list.length)return;
+ let ok=0;
+ for(const i of list){try{upsertLocal(await rpc('set_status',{p_token:S.token,p_id:i.id,p_status:'received'}));ok++}catch{}}
+ S.picked=new Set(list.map(i=>i.id));render();
+ toast(ok===list.length?`Marked ${ok} as received.`:`Marked ${ok} of ${list.length}. Try the rest again.`);
+}
+
+/* ---------- monthly report ---------- */
+function periodOf(p){
+ const d=new Date();
+ if(p==='all')return{label:'All submissions',start:null,end:null,slug:'all'};
+ const start=new Date(d.getFullYear(),d.getMonth()-(p==='last'?1:0),1),end=new Date(start.getFullYear(),start.getMonth()+1,1);
+ return{label:start.toLocaleDateString('en-US',{month:'long',year:'numeric'}),start,end,slug:`${start.getFullYear()}-${String(start.getMonth()+1).padStart(2,'0')}`};
+}
+const inP=(iso,P)=>!!iso&&(!P.start||(new Date(iso)>=P.start&&new Date(iso)<P.end));
+const bucket=s=>s==='done'?'completed':s==='progress'?'progress':'other';
+const RSTATUS={new:'New',received:'Received',progress:'In Progress',done:'Complete'};
+async function downloadReport(kind){
+ const P=periodOf(S.period);
+ const subs=S.issues.filter(i=>inP(i.reportedAt,P)).sort((a,b)=>a.reportedAt<b.reportedAt?-1:1);
+ const carry=P.start?S.issues.filter(i=>i.status!=='done'&&i.reportedAt&&new Date(i.reportedAt)<P.start).sort((a,b)=>a.reportedAt<b.reportedAt?-1:1):[];
+ if(kind==='csv'){
+  const rows=[['Date of Submission','Area','Reported Feedback','Status','Notes','Completed','Reported by','Latitude','Longitude','Photo links']];
+  for(const i of [...subs,...carry])rows.push([fmtDate(i.reportedAt),AREA[i.area]?.[1]||i.area,i.note,RSTATUS[i.status],i.staffNote,fmtDate(i.doneAt),who(i.reportedBy),hasLL(i)?i.lat:'',hasLL(i)?i.lng:'',(i.photos||[]).map(photoURL).join(' ')]);
+  saveFile(`McCune-Park-submissions-${P.slug}.csv`,'﻿'+rows.map(r=>r.map(csvCell).join(',')).join('\r\n'),'text/csv');
+  return;
+ }
+ toast('Preparing report…');
+ const uris={};for(const p of new Set(subs.flatMap(i=>i.photos||[])))uris[p]=await toDataURL(photoURL(p));
+ saveFile(`McCune-Park-Ambassador-Report-${P.slug}.html`,reportHTML(P,subs,carry,uris),'text/html');
+}
+function pieSVG(parts){
+ const total=parts.reduce((a,p)=>a+p.n,0),R=118,cx=130,cy=130;
+ if(!total)return `<svg viewBox="0 0 260 260" width="240" height="240"><circle cx="${cx}" cy="${cy}" r="${R}" fill="#e6e6e1"/><text x="${cx}" y="${cy+5}" text-anchor="middle" font-size="15" fill="#555">No submissions</text></svg>`;
+ let a0=-Math.PI/2,out='';
+ for(const p of parts){
+  if(!p.n)continue;
+  if(p.n===total){out+=`<circle cx="${cx}" cy="${cy}" r="${R}" fill="${p.c}"/>`;break}
+  const a1=a0+2*Math.PI*p.n/total,large=a1-a0>Math.PI?1:0;
+  out+=`<path d="M${cx},${cy} L${cx+R*Math.cos(a0)},${cy+R*Math.sin(a0)} A${R},${R} 0 ${large} 1 ${cx+R*Math.cos(a1)},${cy+R*Math.sin(a1)} Z" fill="${p.c}" stroke="#fff" stroke-width="2"/>`;
+  a0=a1;
+ }
+ return `<svg viewBox="0 0 260 260" width="240" height="240" role="img" aria-label="Submissions by status">${out}</svg>`;
+}
+function reportHTML(P,subs,carry,uris){
+ const n={completed:0,progress:0,other:0};for(const i of subs)n[bucket(i.status)]++;
+ const total=subs.length,pct=x=>total?Math.round(100*x/total)+'%':'0%';
+ const parts=[{k:'Completed',n:n.completed,c:'#0f9d58'},{k:'In Progress',n:n.progress,c:'#2f6fb5'},{k:'Other',n:n.other,c:'#c9a227'}];
+ const legend=parts.filter(p=>p.n).map(p=>`<div><i style="background:${p.c}"></i>${p.k} ${pct(p.n)}</div>`).join('')||'<div>No submissions this month</div>';
+ const names=[...new Set(subs.map(i=>i.reportedBy).filter(Boolean))].filter(x=>x!=='Park ambassador');
+ const ambName=names.length?names.join(', '):(S.role==='owner'?S.label:'');
+ const row=i=>`<tr><td class="c">${fmtDate(i.reportedAt)}</td><td><b>${esc(AREA[i.area]?.[1]||'')}</b>${i.note?': '+esc(i.note):''}${hasLL(i)?`<br><a href="${mapsLink(i)}">Map location</a>`:''}</td><td class="c">${esc(RSTATUS[i.status]||'')}</td><td class="c">${esc(i.staffNote||(i.status==='done'?'Complete':''))}</td></tr>`;
+ const table=arr=>`<table class="subs"><thead><tr><th>Date of<br>Submission</th><th>Reported Feedback</th><th>Status</th><th>Notes</th></tr></thead><tbody>${arr.map(row).join('')}</tbody></table>`;
+ const photos=subs.filter(i=>(i.photos||[]).some(p=>uris[p])).map(i=>`<figure><figcaption>${fmtDate(i.reportedAt)} · ${esc(AREA[i.area]?.[1]||'')}</figcaption><div>${i.photos.filter(p=>uris[p]).map(p=>`<img src="${uris[p]}" alt="">`).join('')}</div></figure>`).join('');
+ return `<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Ambassador Submission Report · McCune Family Park · ${esc(P.label)}</title>
+<style>@page{margin:14mm}
+body{font-family:"Helvetica Neue",Arial,sans-serif;color:#111;background:#fdfdf8;max-width:780px;margin:0 auto;padding:28px 18px}
+h1{font-weight:300;font-size:44px;margin:0 0 10px;letter-spacing:-.01em}
+.bar{display:grid;grid-template-columns:1fr 1fr;border-top:2px solid #111;border-bottom:2px solid #111}
+.bar div{padding:16px 12px;font-weight:700;font-size:17px;text-align:center}.bar div+div{border-left:2px solid #111}
+h2{text-align:center;font-size:38px;font-weight:800;margin:26px 0 18px}
+.sum{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-around;gap:24px;margin-bottom:28px}
+table{border-collapse:collapse}
+.tot td,.tot th{border:2px solid #111;padding:14px 18px;text-align:center;font-size:17px}
+.tot th{background:#0f9d58;font-weight:700}
+.pie{text-align:center;font-size:15px}.pie i{display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:6px}
+.subs{width:100%;margin-top:6px}.subs th,.subs td{border:1.5px solid #111;padding:8px 10px;font-size:13.5px;vertical-align:middle}
+.subs th{background:#0f9d58;font-size:15px}.subs td.c{text-align:center}.subs a{color:#0b6b3c;font-size:12px}
+h3{font-size:18px;margin:30px 0 8px}
+figure{margin:14px 0;break-inside:avoid}figcaption{font-weight:700;font-size:13px;margin-bottom:6px}
+figure div{display:flex;flex-wrap:wrap;gap:8px}figure img{width:230px;height:172px;object-fit:cover;border:1px solid #ccc}
+.foot{margin-top:30px;font-size:11.5px;color:#666}</style></head><body>
+<h1>Ambassador Submission Report</h1>
+<div class="bar"><div>Park Name - McCune Family Park</div><div>Park Ambassador${ambName?' - '+esc(ambName):''}</div></div>
+<h2>${esc(P.label)}</h2>
+<div class="sum">
+ <table class="tot"><tr><th>Total<br>Submissions</th><th>${total}</th></tr>
+  <tr><td>Completed</td><td>${n.completed}</td></tr><tr><td>In Progress</td><td>${n.progress}</td></tr><tr><td>Other</td><td>${n.other}</td></tr></table>
+ <div class="pie">${pieSVG(parts)}${legend}</div>
+</div>
+${total?table(subs):'<p style="text-align:center">No submissions this month.</p>'}
+${carry.length?`<h3>Still open from earlier months</h3>${table(carry)}`:''}
+${photos?`<h3>Photos</h3>${photos}`:''}
+<p class="foot">"Other" includes submissions that are new or received but not yet in progress. Generated ${fmtDate(now())} from McCune Park Pins.</p>
+</body></html>`;
+}
+
+/* ---------- boot ---------- */
+let pendingRender=false;
+const typing=a=>a&&$('panel').contains(a)&&/^(TEXTAREA|INPUT|SELECT)$/.test(a.tagName)&&a.type!=='checkbox'&&!a.readOnly;
+function softRender(){if(typing(document.activeElement)||S.draft){pendingRender=true;drawPins();return}render()}
+$('panel').addEventListener('focusout',()=>{if(pendingRender){setTimeout(()=>{if(!typing(document.activeElement)&&!S.draft){pendingRender=false;render()}},0)}});
+
+function readHash(){
+ const p=new URLSearchParams((location.hash||'').replace(/^#/,''));
+ return {k:p.get('k'),v:p.get('v')};
+}
+function gate(msg){$('app').hidden=true;$('gate').hidden=false;if(msg)$('gatemsg').textContent=msg}
+async function boot(){
+ const h=readHash();
+ let k=h.k;
+ try{if(k)localStorage.setItem('pins.k',k);else k=localStorage.getItem('pins.k')}catch{}
+ if(!k){gate();return}
+ S.token=k;
+ let me;
+ try{me=await rpc('whoami',{p_token:k})}
+ catch(e){
+  if(e.status>=400&&e.status<500){try{localStorage.removeItem('pins.k')}catch{}gate('This link isn’t valid anymore. Ask for a new link.')}
+  else gate('Can’t reach the server right now. Check your connection and reload.');
+  return;
+ }
+ Object.assign(S,{role:me.role,label:me.label,links:me.links||null});
+ S.view=me.role==='staff'?'staff':me.role==='ambassador'?'amb':(h.v==='jcsd'||h.v==='staff'?'staff':'amb');
+ $('switch').hidden=me.role!=='owner';
+ $('viewlabel').hidden=me.role==='owner';
+ $('viewlabel').textContent=me.role==='staff'?'JCSD staff':'Park ambassador';
+ if(!h.k)setHashView(S.view);
+ $('gate').hidden=true;$('app').hidden=false;
+ initMap();render();
+ await load();
+ setInterval(()=>{if(document.visibilityState==='visible')load()},POLL_MS);
+ document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible')load()});
+}
+boot();
+})();
+</script>
+</body>
+</html>
