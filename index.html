@@ -147,6 +147,46 @@ dl.kv dt{color:var(--muted)} dl.kv dd{margin:0;min-width:0;overflow-wrap:anywher
 .linkrow{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:8px;align-items:center}
 .linkrow input{font-size:13px;padding:7px 9px}
 
+/* dashboard */
+:root{--series-1:#2a78d6;--series-2:#1baf7a;--grid:#e3e7e0}
+@media (prefers-color-scheme:dark){:root{--series-1:#3987e5;--series-2:#199e70;--grid:#2c352f}}
+.stats{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px}
+@media (max-width:460px){.stats{grid-template-columns:repeat(2,minmax(0,1fr))}}
+.stat{background:var(--bg);border-radius:10px;padding:10px 10px 9px;min-width:0}
+.stat b{display:block;font-family:var(--display);font-size:32px;line-height:1;font-variant-numeric:tabular-nums}
+.stat span{display:block;font-size:12px;font-weight:600;color:var(--muted);margin-top:3px}
+.chart{width:100%;height:auto;display:block;overflow:visible}
+.chart text{font-family:var(--body);font-size:11px;fill:var(--muted)}
+.chart .val{fill:var(--ink);font-weight:600}
+.chart .gl{stroke:var(--grid);stroke-width:1}
+.chart rect.hit{fill:transparent;cursor:default}
+.chart g.col:hover rect.bar{opacity:.85}
+.keys{display:flex;flex-wrap:wrap;gap:4px 14px;font-size:12.5px;color:var(--muted)}
+.keys i{display:inline-block;width:10px;height:10px;border-radius:3px;margin-right:6px;vertical-align:-1px}
+.hbars{display:flex;flex-direction:column;gap:7px}
+.hbar{display:grid;grid-template-columns:minmax(0,9.5em) minmax(0,1fr) 2.2em;gap:8px;align-items:center;font-size:13px}
+.hbar .nm{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.hbar .tr{height:10px;background:var(--bg);border-radius:0 4px 4px 0}
+.hbar .fl{height:100%;background:var(--series-1);border-radius:0 4px 4px 0;min-width:2px}
+.hbar .n{text-align:right;font-variant-numeric:tabular-nums;font-weight:600}
+details.tbl summary{cursor:pointer;font-size:12.5px;color:var(--accent);font-weight:600}
+details.tbl table{border-collapse:collapse;font-size:12.5px;margin-top:6px;width:100%}
+details.tbl td,details.tbl th{border-bottom:1px solid var(--line);padding:4px 6px;text-align:right}
+details.tbl td:first-child,details.tbl th:first-child{text-align:left}
+/* park walk */
+.walkcard{border-color:var(--accent)}
+.wrow{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:6px 12px;align-items:center;padding:10px 0;border-top:1px solid var(--line)}
+.wrow:first-child{border-top:0}
+.wrow .nm{font-weight:600}
+.wrow .ds{font-size:12.5px;color:var(--muted)}
+.wrow .ex{grid-column:1/-1;display:flex;flex-wrap:wrap;gap:8px;align-items:center;font-size:13px}
+.seg{display:flex;border:1px solid var(--line);border-radius:9px;overflow:hidden}
+.seg button{border:0;background:var(--bg);padding:7px 10px;font-size:13px;font-weight:600;cursor:pointer;color:var(--muted)}
+.seg button+button{border-left:1px solid var(--line)}
+.seg button.ok[aria-pressed="true"]{background:var(--s-done);color:#fff}
+.seg button.att[aria-pressed="true"]{background:var(--s-new);color:#fff}
+.progress{height:6px;background:var(--bg);border-radius:99px;overflow:hidden}
+.progress i{display:block;height:100%;background:var(--accent)}
 .gate{max-width:520px;margin:12vh auto;padding:0 16px;text-align:center}
 .gate h1{font-family:var(--display);font-size:34px;margin:0 0 8px}
 .toast{position:fixed;left:50%;bottom:calc(18px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);background:var(--ink);color:var(--bg);padding:10px 16px;border-radius:10px;font-size:14px;font-weight:600;max-width:calc(100% - 32px);z-index:2000}
@@ -164,13 +204,14 @@ dl.kv dt{color:var(--muted)} dl.kv dd{margin:0;min-width:0;overflow-wrap:anywher
 
 <div id="app" hidden>
 <header class="top">
-  <div class="brand"><b>McCune Park Pins</b><span>McCune Family Park · 7450 Eastvale Pkwy · Pilot, not an official JCSD tool</span></div>
+  <div class="brand"><b>McCune Park Pins</b><span>McCune Family Park · 7450 Eastvale Pkwy</span></div>
   <div class="topright">
     <div class="switch" id="switch" role="group" aria-label="View" hidden>
       <button id="v-amb" aria-pressed="true">Ambassador</button>
       <button id="v-staff" aria-pressed="false">JCSD staff</button>
     </div>
     <span class="viewlabel" id="viewlabel" hidden></span>
+    <button class="btn sm" id="sharelinks" hidden aria-expanded="false">Share links</button>
   </div>
 </header>
 <div id="banner" class="banner" hidden></div>
@@ -192,7 +233,7 @@ dl.kv dt{color:var(--muted)} dl.kv dd{margin:0;min-width:0;overflow-wrap:anywher
   </section>
   <section class="panel" id="panel" aria-live="polite"></section>
 </main>
-<p class="foot">Pilot for collecting feedback. Reports and photos are visible to everyone with a link to this site.</p>
+<p class="foot">Reports and photos are visible to everyone with a link to this site.</p>
 </div>
 
 <div id="toast" class="toast" hidden></div>
@@ -233,7 +274,8 @@ const AREA=Object.fromEntries(AREAS.map(a=>[a[0],a]));
 const STATUS={new:'New',received:'Received',progress:'In progress',done:'Done'};
 
 const S={token:null,role:null,label:'',links:null,view:'amb',issues:[],loaded:false,draft:null,sel:null,filter:'all',period:'this',
- busy:false,confirmDel:false,editNote:null,picked:null,lastSync:null};
+ busy:false,confirmDel:false,editNote:null,picked:null,lastSync:null,
+ walks:[],walk:null,walkOpen:false,pinFor:null,showLinks:false,confirmDiscard:false};
 const $=id=>document.getElementById(id);
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const code=id=>id?id.replace(/[^a-z0-9]/gi,'').slice(-4).toUpperCase():'';
@@ -271,14 +313,15 @@ async function uploadPhoto(blob){
  return name;
 }
 const norm=r=>({id:r.id,lat:r.lat,lng:r.lng,area:r.area,note:r.note||'',photos:r.photos||[],status:r.status,reportedBy:r.reported_by,
- reportedAt:r.reported_at,updatedAt:r.updated_at,doneAt:r.done_at,sharedAt:r.shared_at,staffNote:r.staff_note||'',history:r.history||[]});
+ reportedAt:r.reported_at,source:r.source||'app',updatedAt:r.updated_at,doneAt:r.done_at,sharedAt:r.shared_at,staffNote:r.staff_note||'',history:r.history||[]});
+const normWalk=r=>({id:r.id,walkedAt:r.walked_at,by:r.walked_by,items:r.items||{},issueIds:r.issue_ids||[],comments:r.comments||'',source:r.source||'app'});
 function upsertLocal(row){if(!row||!row.id)return;const n=norm(row),ix=S.issues.findIndex(i=>i.id===n.id);if(ix>=0)S.issues[ix]=n;else S.issues.unshift(n)}
 let loading=false;
 async function load(){
  if(loading)return;loading=true;
  try{
-  const rows=await rpc('list_issues',{p_token:S.token});
-  S.issues=(rows||[]).map(norm);S.loaded=true;S.lastSync=new Date();
+  const [rows,walks]=await Promise.all([rpc('list_issues',{p_token:S.token}),rpc('list_walks',{p_token:S.token}).catch(()=>null)]);
+  S.issues=(rows||[]).map(norm);if(walks)S.walks=walks.map(normWalk);S.loaded=true;S.lastSync=new Date();
   if(S.sel&&!S.issues.some(i=>i.id===S.sel))S.sel=null;
   banner('');softRender();
  }catch(e){banner(e.status>=400&&e.status<500?e.message:'Can’t reach the server. Showing the last loaded reports; retrying.')}
@@ -303,8 +346,8 @@ function initMap(){
  new ResizeObserver(()=>map.invalidateSize()).observe($('map'));
 }
 function startDraft(lat,lng){
- const keep=S.draft||{note:'',files:[],area:''};
- S.draft={...keep,lat,lng};S.sel=null;render();
+ const keep=S.draft||{note:'',files:[],area:S.pinFor||'',fromWalk:!!(S.walk&&S.walkOpen)||!!S.pinFor};
+ S.draft={...keep,lat,lng};S.sel=null;S.walkOpen=false;render();
 }
 const COL={new:'--s-new',received:'--s-received',progress:'--s-progress',done:'--s-done'};
 const cssVar=n=>getComputedStyle(document.documentElement).getPropertyValue(n).trim()||'#888';
@@ -356,6 +399,120 @@ $('locate').addEventListener('click',()=>{
  },{enableHighAccuracy:true,timeout:15000,maximumAge:10000});
 });
 
+
+/* ---------- park walk ---------- */
+const WALK_KEYS=AREAS.map(a=>a[0]).filter(k=>k!=='other');
+const WALK_NOTES={restrooms:'Only inspect the restroom of your gender.'};
+function saveWalk(){try{S.walk?localStorage.setItem('pins.walk',JSON.stringify(S.walk)):localStorage.removeItem('pins.walk')}catch{}}
+function loadWalk(){try{const w=JSON.parse(localStorage.getItem('pins.walk')||'null');if(w&&w.items&&Array.isArray(w.issueIds))return w}catch{}return null}
+function startWalk(){S.walk={startedAt:now(),items:{},issueIds:[],comments:''};saveWalk();S.walkOpen=true;S.sel=null;S.confirmDiscard=false;render();scrollPanel()}
+function scrollPanel(){if(matchMedia('(max-width:900px)').matches)$('panel').scrollIntoView({behavior:'smooth',block:'start'})}
+function walkPins(k){return S.walk.issueIds.map(id=>S.issues.find(i=>i.id===id)).filter(i=>i&&i.area===k)}
+function renderWalkStart(){
+ if(!canReport())return'';
+ if(S.walk){
+  const n=WALK_KEYS.filter(k=>S.walk.items[k]).length;
+  return `<div class="card stack walkcard"><div><p class="eyebrow">Park walk in progress</p><h3>${n} of ${WALK_KEYS.length} areas checked</h3>
+   <div class="progress" aria-hidden="true"><i style="width:${Math.round(100*n/WALK_KEYS.length)}%"></i></div></div>
+   <div class="row"><button class="btn primary" id="w-continue">Continue park walk</button></div></div>`;
+ }
+ return `<div class="card stack walkcard"><div><p class="eyebrow">Park walk</p><h3>Start today's inspection</h3>
+  <p class="muted small" style="margin:0">Go through the ${WALK_KEYS.length}-area checklist. Areas you mark good are logged too, so JCSD can see the whole park was checked. You can also tap the map any time to report a single problem.</p></div>
+  <div class="row"><button class="btn primary" id="w-start">Start park walk</button></div></div>`;
+}
+function renderPinPrompt(){
+ return `<div class="card stack walkcard"><div><p class="eyebrow">Park walk · ${esc(AREA[S.pinFor]?.[1]||'')}</p><h3>Tap the map where the problem is</h3>
+  <p class="muted small" style="margin:0">Or use <b>Pin my location</b> while you're standing at it.</p></div>
+  <div class="row"><button class="btn" id="w-pincancel">Back to checklist</button></div></div>`;
+}
+function renderWalk(){
+ const w=S.walk,it=w.items,n=WALK_KEYS.filter(k=>it[k]).length,left=WALK_KEYS.length-n;
+ const rows=WALK_KEYS.map(k=>{
+  const [,name,desc]=AREA[k],v=it[k],pins=v==='attention'?walkPins(k):[];
+  return `<div class="wrow"><div><div class="nm">${esc(name)}</div>${desc||WALK_NOTES[k]?`<div class="ds">${esc([desc,WALK_NOTES[k]].filter(Boolean).join(' · '))}</div>`:''}</div>
+   <div class="seg" role="group" aria-label="${esc(name)}"><button class="ok" data-wset="${k}:ok" aria-pressed="${v==='ok'}">Good</button><button class="att" data-wset="${k}:attention" aria-pressed="${v==='attention'}">Needs attention</button></div>
+   ${v==='attention'?`<div class="ex">${pins.map(i=>`<button class="linkbtn" data-open="${esc(i.id)}">#${code(i.id)} pinned</button>`).join('')}
+    <button class="btn sm" data-wpin="${k}">${pins.length?'+ Another pin':'+ Drop a pin'}</button>
+    ${!pins.length?'<span class="muted small">Add a pin so JCSD knows what and where.</span>':''}
+    ${k==='graffiti'?'<span class="small">Also report it in the My JCSD app or at <a href="https://www.jcsd.us/HowDoI/ReportGraffiti/" target="_blank" rel="noopener">jcsd.us</a>.</span>':''}</div>`:''}
+  </div>`;
+ }).join('');
+ return `<div class="card stack walkcard">
+  <div class="row" style="justify-content:space-between"><button class="linkbtn" id="w-close">← Save and close</button><span class="muted small">Started ${fmt(w.startedAt)}</span></div>
+  <div><p class="eyebrow">Park walk</p><h3>Observation checklist</h3>
+   <div class="progress" aria-hidden="true"><i style="width:${Math.round(100*n/WALK_KEYS.length)}%"></i></div>
+   <p class="muted small" style="margin:6px 0 0">${n} of ${WALK_KEYS.length} checked${left?` · <button class="linkbtn" id="w-allgood">Mark the other ${left} good</button>`:''}</p></div>
+  <div>${rows}</div>
+  <label class="f" for="w-comments">Additional comments or observations<textarea id="w-comments" style="min-height:70px">${esc(w.comments)}</textarea></label>
+  <div class="row"><button class="btn primary" id="w-finish" ${S.busy?'disabled':''}>${S.busy?'Saving…':left?`Finish walk (${left} not checked)`:'Finish walk'}</button>
+   <button class="btn danger" id="w-discard" style="margin-left:auto">${S.confirmDiscard?'Tap again to discard':'Discard walk'}</button></div>
+ </div>`;
+}
+async function finishWalk(){
+ if(!S.walk||S.busy)return;
+ S.busy=true;render();
+ try{
+  const items=Object.fromEntries(Object.entries(S.walk.items).filter(([,v])=>v));
+  const r=await rpc('submit_walk',{p_token:S.token,p_items:items,p_issue_ids:S.walk.issueIds,p_comments:S.walk.comments||''});
+  S.walks.unshift(normWalk(r));S.walk=null;saveWalk();S.walkOpen=false;toast('Park walk logged. JCSD can see it now.');
+ }catch(err){toast('The walk was not saved. '+err.message)}
+ finally{S.busy=false;render()}
+}
+const walkSummary=w=>{
+ const vals=Object.entries(w.items||{}),att=vals.filter(([,v])=>v==='attention').map(([k])=>AREA[k]?.[1]||k);
+ return {checked:vals.length,att};
+};
+
+/* ---------- dashboard ---------- */
+function barPath(x,y,w,h,r){r=Math.min(r,w/2,h);return `M${x},${y+h}V${y+r}Q${x},${y} ${x+r},${y}H${x+w-r}Q${x+w},${y} ${x+w},${y+r}V${y+h}Z`}
+function niceMax(v){if(v<=4)return 4;const p=Math.pow(10,Math.floor(Math.log10(v))),f=v/p;return (f<=2?2:f<=5?5:10)*p}
+function renderDashboard(){
+ const y=new Date().getFullYear(),thisM=new Date().getMonth(),inY=iso=>!!iso&&new Date(iso).getFullYear()===y;
+ const rep=S.issues.filter(i=>inY(i.reportedAt)),res=S.issues.filter(i=>i.status==='done'&&inY(i.doneAt));
+ const open=S.issues.filter(i=>i.status!=='done').length,walks=S.walks.filter(w=>inY(w.walkedAt));
+ const days=res.map(i=>(new Date(i.doneAt)-new Date(i.reportedAt))/864e5).filter(d=>d>=0).sort((a,b)=>a-b);
+ let med=null;if(days.length){const n=days.length;med=n%2?days[(n-1)/2]:(days[n/2-1]+days[n/2])/2}
+ const medTxt=med===null?'':med<1?'under a day':`${Math.round(med)} day${Math.round(med)===1?'':'s'}`;
+ const last=S.walks[0],ls=last&&walkSummary(last);
+ const stats=`<div class="stats">
+  <div class="stat"><b>${res.length}</b><span>Resolved</span></div>
+  <div class="stat"><b>${rep.length}</b><span>Reported</span></div>
+  <div class="stat"><b>${open}</b><span>Still open</span></div>
+  <div class="stat"><b>${walks.length}</b><span>Park walks</span></div></div>`;
+ const meta=[medTxt?`Typical time to fix: <b>${medTxt}</b>`:'',last?`Last park walk: <b>${fmt(last.walkedAt)}</b>, ${ls.att.length?`${ls.att.length} area${ls.att.length>1?'s':''} needed attention`:'all areas good'}`:''].filter(Boolean);
+ // monthly reported vs resolved
+ const months=[...Array(thisM+1).keys()],M=months.map(m=>({m,lab:new Date(y,m,1).toLocaleDateString('en-US',{month:'short'}),rep:0,res:0}));
+ rep.forEach(i=>M[new Date(i.reportedAt).getMonth()].rep++);res.forEach(i=>M[new Date(i.doneAt).getMonth()].res++);
+ const W=600,H=190,L=26,Rr=6,T=10,B=22,iw=W-L-Rr,ih=H-T-B,mx=niceMax(Math.max(1,...M.map(d=>Math.max(d.rep,d.res))));
+ const gw=iw/M.length,bw=Math.max(4,Math.min(16,gw*.3)),ys=v=>T+ih-ih*v/mx;
+ const ticks=[0,mx/2,mx].map(v=>`<line class="gl" x1="${L}" x2="${W-Rr}" y1="${ys(v)}" y2="${ys(v)}"/><text x="${L-6}" y="${ys(v)+4}" text-anchor="end">${v}</text>`).join('');
+ const cols=M.map((d,ix)=>{const cx=L+gw*ix+gw/2,x1=cx-bw-1,x2=cx+1;
+  const b=(x,v,c)=>v?`<path class="bar" d="${barPath(x,ys(v),bw,T+ih-ys(v),4)}" fill="var(${c})"/>`:'';
+  return `<g class="col"><title>${d.lab} ${y}: ${d.rep} reported, ${d.res} resolved</title><rect class="hit" x="${L+gw*ix}" y="${T}" width="${gw}" height="${ih}"/>${b(x1,d.rep,'--series-1')}${b(x2,d.res,'--series-2')}
+   <text x="${cx}" y="${H-6}" text-anchor="middle">${d.lab}</text></g>`}).join('');
+ const chart=`<svg class="chart" viewBox="0 0 ${W} ${H}" role="img" aria-label="Reported and resolved issues by month, ${y}">${ticks}${cols}</svg>`;
+ const table=`<details class="tbl"><summary>Show as table</summary><table><thead><tr><th>Month</th><th>Reported</th><th>Resolved</th></tr></thead><tbody>${M.map(d=>`<tr><td>${d.lab}</td><td>${d.rep}</td><td>${d.res}</td></tr>`).join('')}</tbody></table></details>`;
+ // by area
+ const by={};rep.forEach(i=>by[i.area]=(by[i.area]||0)+1);
+ const top=Object.entries(by).sort((a,b)=>b[1]-a[1]).slice(0,8),tm=top.length?top[0][1]:1;
+ const bars=top.map(([k,n])=>`<div class="hbar" title="${esc(AREA[k]?.[1]||k)}: ${n}"><span class="nm">${esc(AREA[k]?.[1]||k)}</span><span class="tr"><span class="fl" style="display:block;width:${Math.max(2,100*n/tm)}%"></span></span><span class="n">${n}</span></div>`).join('');
+ const empty=!rep.length&&!res.length;
+ return `<div class="card stack"><div><p class="eyebrow">McCune Family Park · ${y} so far</p><h3>Park dashboard</h3></div>
+  ${stats}${meta.length?`<p class="small muted" style="margin:0">${meta.join('<br>')}</p>`:''}
+  ${empty?`<p class="empty" style="padding:4px 0">No reports yet this year. The monthly chart and top areas fill in as reports come in.</p>`:`
+  <div class="stack" style="gap:6px"><div class="row" style="justify-content:space-between"><b class="small">Reported vs. resolved by month</b>
+   <span class="keys"><span><i style="background:var(--series-1)"></i>Reported</span><span><i style="background:var(--series-2)"></i>Resolved</span></span></div>${chart}${table}</div>
+  <div class="stack" style="gap:8px"><b class="small">Most-reported areas</b><div class="hbars">${bars}</div></div>`}
+ </div>`;
+}
+function renderWalksStaff(){
+ const list=S.walks.slice(0,6);
+ const rows=list.map(w=>{const s=walkSummary(w);return `<div class="item" style="cursor:default;grid-template-columns:minmax(0,1fr) auto">
+  <span class="t">${fmt(w.walkedAt)} · ${esc(who(w.by))}</span><span class="chip ${s.att.length?'st-new':'st-done'}">${s.att.length?`${s.att.length} need attention`:'All good'}</span>
+  <span class="d" style="grid-column:1/-1">${s.checked} of ${WALK_KEYS.length} areas checked${s.att.length?' · '+esc(s.att.join(', ')):''}${w.comments?' · “'+esc(w.comments)+'”':''}</span></div>`}).join('');
+ return `<div class="card"><p class="eyebrow">Park walks · ${S.walks.length}</p><div class="list">${rows||`<p class="empty">No park walks logged yet.</p>`}</div></div>`;
+}
+
 /* ---------- panel ---------- */
 function chip(s){return `<span class="chip st-${esc(s)}">${esc(STATUS[s]||s)}</span>`}
 function photoGrid(ids){return ids&&ids.length?`<div class="photos">${ids.map(p=>`<button class="ph" data-photo="${esc(p)}" aria-label="Open photo"><img src="${esc(photoURL(p))}" alt="Reported photo" loading="lazy"></button>`).join('')}</div>`:''}
@@ -363,14 +520,14 @@ function itemRow(i){
  return `<button class="item" data-open="${esc(i.id)}">
   <span class="num">#${code(i.id)}</span><span class="t">${esc(AREA[i.area]?.[1]||'Report')}</span>${chip(i.status)}
   <span class="d">${esc(i.note||'(photo only)')}</span>
-  <span class="m">${fmt(i.reportedAt)}${i.photos?.length?` · ${i.photos.length} photo${i.photos.length>1?'s':''}`:''}${S.view==='staff'?' · '+esc(who(i.reportedBy)):''}${hasLL(i)?'':' · no map location'}</span></button>`;
+  <span class="m">${fmt(i.reportedAt)}${i.photos?.length?` · ${i.photos.length} photo${i.photos.length>1?'s':''}`:''}${S.view==='staff'?' · '+esc(who(i.reportedBy)):''}${i.source==='form'?' · from Google Form':(hasLL(i)?'':' · no map location')}</span></button>`;
 }
 function renderDraft(){
  const d=S.draft;
  const opts=AREAS.map(([k,l,desc])=>`<option value="${k}" ${d.area===k?'selected':''}>${esc(l)}${desc?' — '+esc(desc):''}</option>`).join('');
  const thumbs=d.files.map((f,ix)=>`<div class="ph"><img src="${f.url}" alt="Selected photo ${ix+1}"><button class="x" data-rm="${ix}" aria-label="Remove photo">×</button></div>`).join('');
  return `<div class="card stack">
-  <div><p class="eyebrow">New report</p><h3>What needs attention?</h3>
+  <div><p class="eyebrow">${d.fromWalk&&S.walk?'Park walk · new report':'New report'}</p><h3>What needs attention?</h3>
   <p class="muted small" style="margin:0">Pin dropped. Drag it, or tap the map again, to move it.</p></div>
   <label class="f" for="f-area">Area<select id="f-area"><option value="">Choose an area…</option>${opts}</select></label>
   ${d.area==='graffiti'?`<p class="note">JCSD asks that graffiti also be reported right away through the My JCSD app or at <a href="https://www.jcsd.us/HowDoI/ReportGraffiti/" target="_blank" rel="noopener">jcsd.us</a>.</p>`:''}
@@ -406,7 +563,7 @@ function renderLinks(){
  if(S.role!=='owner'||!S.links)return'';
  const base=location.origin+location.pathname;
  const row=(id,label,url)=>`<label class="f" for="${id}">${label}<div class="linkrow"><input type="text" id="${id}" readonly value="${esc(url)}"><button class="btn sm" data-copy="${id}">Copy</button></div></label>`;
- return `<div class="card stack"><div><p class="eyebrow">Links to share</p><h3>Send these links</h3>
+ return `<div class="card stack walkcard"><div class="row" style="justify-content:space-between"><p class="eyebrow" style="margin:0">Share links</p><button class="linkbtn" id="links-close">Close</button></div><div><h3>Send these links</h3>
   <p class="muted small" style="margin:0">No sign-in needed. Anyone with a link can use it, so share each one only with the person it's for.</p></div>
   ${S.links.staff?row('lk-staff','JCSD staff (status, notes, reports, ranger sheets)',`${base}#k=${S.links.staff}`):''}
   ${S.links.ambassador?row('lk-amb','Park ambassador (drop pins, follow status)',`${base}#k=${S.links.ambassador}`):''}
@@ -415,19 +572,18 @@ function renderLinks(){
 function counts(){const c={all:S.issues.length,new:0,received:0,progress:0,done:0};for(const i of S.issues)c[i.status]=(c[i.status]||0)+1;return c}
 function render(){
  $('v-amb').setAttribute('aria-pressed',S.view==='amb');$('v-staff').setAttribute('aria-pressed',S.view==='staff');
- $('maptitle').textContent=S.view==='amb'?(canReport()?'Tap where the problem is':'Park map'):'Reported pins';
+ $('maptitle').textContent=S.view==='amb'?(canReport()?(S.pinFor?'Tap where: '+(AREA[S.pinFor]?.[1]||''):'Tap where the problem is'):'Park map'):'Reported pins';
  $('locate').hidden=!(S.view==='amb'&&canReport());
  const sel=S.sel&&S.issues.find(i=>i.id===S.sel);
  let html='';
  if(S.view==='amb'){
   if(S.draft)html=renderDraft();
+  else if(S.pinFor&&S.walk)html=renderPinPrompt();
+  else if(S.walkOpen&&S.walk)html=renderWalk();
   else if(sel)html=renderDetail(sel);
   else{
-   html=`<div class="card"><p class="eyebrow">Park walk</p><h3>Drop a pin for each problem</h3>
-    <p class="muted" style="margin:4px 0 0">Tap the spot on the map, or use <b>Pin my location</b> while you're standing at it. Choose the area, describe it and add photos. JCSD sees it right away and you can follow its status here.</p></div>
-    <div class="card"><p class="eyebrow">Reports · ${S.issues.length}</p>
+   html=renderWalkStart()+renderDashboard()+`<div class="card"><p class="eyebrow">Reports · ${S.issues.length}</p>
      <div class="list">${S.issues.length?S.issues.map(itemRow).join(''):`<p class="empty">${S.loaded?'No reports yet. Your first pin will show up here with its status.':'Loading reports…'}</p>`}</div></div>`;
-   html+=renderLinks();
   }
  }else{
   const c=counts();
@@ -446,8 +602,10 @@ function render(){
     <option value="all" ${S.period==='all'?'selected':''}>All submissions</option></select></label>
    <div class="row"><button class="btn primary" id="r-html">Download report</button><button class="btn" id="r-csv">Spreadsheet (.csv)</button></div>
    <p class="muted small" style="margin:0">The report opens in any browser. Print it or save it as a PDF to email.</p></div>`;
-  if(S.role==='owner')html+=renderLinks();
+  html=html.replace('<div class="card stack"><div><p class="eyebrow">Monthly report</p>',renderWalksStaff()+'<div class="card stack"><div><p class="eyebrow">Monthly report</p>');
  }
+ if(S.showLinks)html=renderLinks()+html;
+ $('sharelinks').setAttribute('aria-expanded',S.showLinks);
  $('panel').innerHTML=html;
  drawPins();
 }
@@ -461,16 +619,26 @@ $('panel').addEventListener('click',async e=>{
  const fl=t.closest('[data-filter]');if(fl){S.filter=fl.dataset.filter;S.sel=null;render();return}
  const st=t.closest('[data-status]');if(st){setStatus(st.dataset.status);return}
  const ps=t.closest('[data-pickset]');if(ps){pickSet(ps.dataset.pickset);return}
+ const ws=t.closest('[data-wset]');if(ws){const [k,v]=ws.dataset.wset.split(':');S.walk.items[k]=v;S.confirmDiscard=false;saveWalk();render();return}
+ const wp=t.closest('[data-wpin]');if(wp){S.pinFor=wp.dataset.wpin;S.walkOpen=false;render();toast('Tap the map where the problem is.');if(matchMedia('(max-width:900px)').matches)$('map').scrollIntoView({behavior:'smooth',block:'center'});return}
  const cp=t.closest('[data-copy]');if(cp){copyText($(cp.dataset.copy).value,'Link copied.',$(cp.dataset.copy));return}
  if(t.matches('[data-pick]'))return;
  switch(t.id){
   case 'd-back':S.sel=null;S.editNote=null;S.confirmDel=false;render();break;
-  case 'f-cancel':clearDraft();render();break;
+  case 'f-cancel':{const back=S.draft&&S.draft.fromWalk&&S.walk;clearDraft();S.pinFor=null;if(back)S.walkOpen=true;render();break}
   case 'f-submit':submit();break;
   case 'd-savenote':saveNote();break;
   case 'd-del':if(!S.confirmDel){S.confirmDel=true;render()}else delIssue();break;
   case 'r-html':downloadReport('html');break;
   case 'r-csv':downloadReport('csv');break;
+  case 'w-start':startWalk();break;
+  case 'w-continue':S.walkOpen=true;S.sel=null;S.confirmDiscard=false;render();scrollPanel();break;
+  case 'w-close':S.walkOpen=false;S.confirmDiscard=false;render();break;
+  case 'w-allgood':for(const k of WALK_KEYS)if(!S.walk.items[k])S.walk.items[k]='ok';saveWalk();render();break;
+  case 'w-finish':finishWalk();break;
+  case 'w-discard':if(!S.confirmDiscard){S.confirmDiscard=true;render()}else{S.walk=null;saveWalk();S.walkOpen=false;S.confirmDiscard=false;toast('Park walk discarded.');render()}break;
+  case 'w-pincancel':S.pinFor=null;S.walkOpen=true;render();break;
+  case 'links-close':S.showLinks=false;render();break;
   case 'sh-html':shareDownload();break;
   case 'sh-copy':shareCopy();break;
   case 'sh-mark':markReceived();break;
@@ -479,6 +647,7 @@ $('panel').addEventListener('click',async e=>{
 $('panel').addEventListener('input',e=>{
  if(e.target.id==='f-note'&&S.draft)S.draft.note=e.target.value;
  if(e.target.id==='d-note')S.editNote=e.target.value;
+ if(e.target.id==='w-comments'&&S.walk){S.walk.comments=e.target.value;saveWalk()}
 });
 $('panel').addEventListener('change',e=>{
  const t=e.target;
@@ -501,9 +670,10 @@ function setHashView(v){
 }
 function goView(v){
  if(v==='staff')clearDraft();
- S.view=v;S.sel=null;S.confirmDel=false;S.editNote=null;setHashView(v);render();
+ S.view=v;S.sel=null;S.confirmDel=false;S.editNote=null;S.walkOpen=false;S.pinFor=null;setHashView(v);render();
 }
 $('v-amb').onclick=()=>goView('amb');
+$('sharelinks').onclick=()=>{S.showLinks=!S.showLinks;render();if(S.showLinks)window.scrollTo({top:0,behavior:'smooth'})};
 $('v-staff').onclick=()=>goView('staff');
 
 /* ---------- writes ---------- */
@@ -525,7 +695,14 @@ async function submit(){
   const names=[];
   for(const f of d.files)names.push(await uploadPhoto(await shrink(f.file)));
   const row=await rpc('submit_issue',{p_token:S.token,p_lat:+d.lat.toFixed(7),p_lng:+d.lng.toFixed(7),p_area:d.area,p_note:d.note.trim(),p_photos:names});
-  upsertLocal(row);clearDraft();S.sel=row.id;toast('Report sent to JCSD.');
+  upsertLocal(row);
+  if(S.walk){
+   S.walk.issueIds=[...new Set([...S.walk.issueIds,row.id])];
+   if(WALK_KEYS.includes(row.area))S.walk.items[row.area]='attention';
+   saveWalk();
+  }
+  const back=d.fromWalk&&S.walk;clearDraft();S.pinFor=null;
+  if(back){S.walkOpen=true;S.sel=null;toast('Report sent. Back to your park walk.')}else{S.sel=row.id;toast('Report sent to JCSD.')}
  }catch(err){toast('The report was not sent. '+(err.message||'Check your connection and try again.'))}
  finally{S.busy=false;render()}
 }
@@ -702,7 +879,8 @@ async function downloadReport(kind){
  }
  toast('Preparing report…');
  const uris={};for(const p of new Set(subs.flatMap(i=>i.photos||[])))uris[p]=await toDataURL(photoURL(p));
- saveFile(`McCune-Park-Ambassador-Report-${P.slug}.html`,reportHTML(P,subs,carry,uris),'text/html');
+ const wk=S.walks.filter(w=>inP(w.walkedAt,P)).sort((a,b)=>a.walkedAt<b.walkedAt?-1:1);
+ saveFile(`McCune-Park-Ambassador-Report-${P.slug}.html`,reportHTML(P,subs,carry,uris,wk),'text/html');
 }
 function pieSVG(parts){
  const total=parts.reduce((a,p)=>a+p.n,0),R=118,cx=130,cy=130;
@@ -717,7 +895,7 @@ function pieSVG(parts){
  }
  return `<svg viewBox="0 0 260 260" width="240" height="240" role="img" aria-label="Submissions by status">${out}</svg>`;
 }
-function reportHTML(P,subs,carry,uris){
+function reportHTML(P,subs,carry,uris,wk=[]){
  const n={completed:0,progress:0,other:0};for(const i of subs)n[bucket(i.status)]++;
  const total=subs.length,pct=x=>total?Math.round(100*x/total)+'%':'0%';
  const parts=[{k:'Completed',n:n.completed,c:'#0f9d58'},{k:'In Progress',n:n.progress,c:'#2f6fb5'},{k:'Other',n:n.other,c:'#c9a227'}];
@@ -744,10 +922,11 @@ table{border-collapse:collapse}
 h3{font-size:18px;margin:30px 0 8px}
 figure{margin:14px 0;break-inside:avoid}figcaption{font-weight:700;font-size:13px;margin-bottom:6px}
 figure div{display:flex;flex-wrap:wrap;gap:8px}figure img{width:230px;height:172px;object-fit:cover;border:1px solid #ccc}
-.foot{margin-top:30px;font-size:11.5px;color:#666}</style></head><body>
+.foot{margin-top:30px;font-size:11.5px;color:#666}.walks{text-align:center;margin:-8px 0 20px;font-size:15px}</style></head><body>
 <h1>Ambassador Submission Report</h1>
 <div class="bar"><div>Park Name - McCune Family Park</div><div>Park Ambassador${ambName?' - '+esc(ambName):''}</div></div>
 <h2>${esc(P.label)}</h2>
+<p class="walks">Park walks completed: <b>${wk.length}</b>${wk.length?` · ${wk.filter(w=>walkSummary(w).checked>=WALK_KEYS.length).length} with all ${WALK_KEYS.length} areas checked`:''}</p>
 <div class="sum">
  <table class="tot"><tr><th>Total<br>Submissions</th><th>${total}</th></tr>
   <tr><td>Completed</td><td>${n.completed}</td></tr><tr><td>In Progress</td><td>${n.progress}</td></tr><tr><td>Other</td><td>${n.other}</td></tr></table>
@@ -755,6 +934,7 @@ figure div{display:flex;flex-wrap:wrap;gap:8px}figure img{width:230px;height:172
 </div>
 ${total?table(subs):'<p style="text-align:center">No submissions this month.</p>'}
 ${carry.length?`<h3>Still open from earlier months</h3>${table(carry)}`:''}
+${wk.length?`<h3>Park walks</h3><table class="subs"><thead><tr><th>Date</th><th>Areas checked</th><th>Needed attention</th><th>Comments</th></tr></thead><tbody>${wk.map(w=>{const s=walkSummary(w);return `<tr><td class="c">${fmtDate(w.walkedAt)}</td><td class="c">${s.checked} of ${WALK_KEYS.length}</td><td>${s.att.length?esc(s.att.join(', ')):'None, all good'}</td><td>${esc(w.comments)}</td></tr>`}).join('')}</tbody></table>`:''}
 ${photos?`<h3>Photos</h3>${photos}`:''}
 <p class="foot">"Other" includes submissions that are new or received but not yet in progress. Generated ${fmtDate(now())} from McCune Park Pins.</p>
 </body></html>`;
@@ -789,6 +969,8 @@ async function boot(){
  $('switch').hidden=me.role!=='owner';
  $('viewlabel').hidden=me.role==='owner';
  $('viewlabel').textContent=me.role==='staff'?'JCSD staff':'Park ambassador';
+ $('sharelinks').hidden=me.role!=='owner';
+ if(canReport())S.walk=loadWalk();
  if(!h.k)setHashView(S.view);
  $('gate').hidden=true;$('app').hidden=false;
  initMap();render();
