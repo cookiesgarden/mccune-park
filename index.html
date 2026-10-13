@@ -556,8 +556,16 @@ function renderDetail(i){
    <label class="f" for="d-note">Note to the ambassador <span class="hint">Appears in the Notes column of the monthly report</span><textarea id="d-note" style="min-height:64px">${esc(noteVal)}</textarea></label>
    <div class="row"><button class="btn" id="d-savenote">Save note</button>
    <button class="btn danger" id="d-del" style="margin-left:auto">${S.confirmDel?'Tap again to delete':'Delete report'}</button></div>`:''}
+  ${!staff&&S.view==='amb'?ambDeleteBlock(i):''}
   ${hist?`<div><p class="eyebrow">History</p><ul class="timeline">${hist}</ul></div>`:''}
  </div>`;
+}
+// Ambassadors may delete their own reports while JCSD hasn't picked them up yet; the owner link may always delete.
+function ambDeleteBlock(i){
+ if(S.role==='owner')return `<div class="row"><button class="btn danger" id="d-del">${S.confirmDel?'Tap again to delete':'Delete report'}</button></div>`;
+ if(S.role!=='ambassador'||i.reportedBy!==S.label)return'';
+ if(i.status!=='new')return `<p class="muted small" style="margin:0">JCSD is already handling this report, so it can't be deleted here. Ask JCSD if it should be removed.</p>`;
+ return `<div class="row"><button class="btn danger" id="d-del">${S.confirmDel?'Tap again to delete':'Delete report'}</button><span class="muted small">You can delete it until JCSD marks it received.</span></div>`;
 }
 function renderLinks(){
  if(S.role!=='owner'||!S.links)return'';
@@ -582,7 +590,7 @@ function render(){
   else if(S.walkOpen&&S.walk)html=renderWalk();
   else if(sel)html=renderDetail(sel);
   else{
-   html=renderWalkStart()+renderDashboard()+`<div class="card"><p class="eyebrow">Reports · ${S.issues.length}</p>
+   html=renderWalkStart()+`<div class="card"><p class="eyebrow">Reports · ${S.issues.length}</p>
      <div class="list">${S.issues.length?S.issues.map(itemRow).join(''):`<p class="empty">${S.loaded?'No reports yet. Your first pin will show up here with its status.':'Loading reports…'}</p>`}</div></div>`;
   }
  }else{
@@ -602,7 +610,7 @@ function render(){
     <option value="all" ${S.period==='all'?'selected':''}>All submissions</option></select></label>
    <div class="row"><button class="btn primary" id="r-html">Download report</button><button class="btn" id="r-csv">Spreadsheet (.csv)</button></div>
    <p class="muted small" style="margin:0">The report opens in any browser. Print it or save it as a PDF to email.</p></div>`;
-  html=html.replace('<div class="card stack"><div><p class="eyebrow">Monthly report</p>',renderWalksStaff()+'<div class="card stack"><div><p class="eyebrow">Monthly report</p>');
+  html=html.replace('<div class="card stack"><div><p class="eyebrow">Monthly report</p>',renderDashboard()+renderWalksStaff()+'<div class="card stack"><div><p class="eyebrow">Monthly report</p>');
  }
  if(S.showLinks)html=renderLinks()+html;
  $('sharelinks').setAttribute('aria-expanded',S.showLinks);
